@@ -1,29 +1,31 @@
 # VinoGuessr · Organization foundation
 
-ワインのブラインドテイスティングを、イベントの作成・出題・回答・採点・シーズンレーティングで楽しめるサービスです。
+VinoGuessr is a service for blind wine tasting: people create events, set questions, answer them, get scored, and build a season rating.
 
-このリポジトリは共通開発規則、Organizationプロフィール、Issue Forms、PRテンプレート、Reusable Workflows、Codex・Claude Codeのエージェント定義の正本です。
+This repository is the source of truth for the shared development rules, the organization profile, Issue Forms, the PR template, reusable workflows, and the Codex and Claude Code agent definitions.
 
 | Repository | Responsibility |
 | --- | --- |
 | [vinoguessr-api](https://github.com/vinoguessr/vinoguessr-api) | Swift 6 / Hummingbird / PostgreSQL / PostgresNIO / Valkey / Atlas / OpenAPI |
-| [vinoguessr-app](https://github.com/vinoguessr/vinoguessr-app) | 利用者向け SwiftUI / iOS・iPadOS・macOS 27.0以上 |
-| [vinoguessr-web](https://github.com/vinoguessr/vinoguessr-web) | 利用者向け Web / Swift・Hummingbird |
+| [vinoguessr-app](https://github.com/vinoguessr/vinoguessr-app) | SwiftUI app for players / iOS, iPadOS, and macOS 27.0 or later |
+| [vinoguessr-web](https://github.com/vinoguessr/vinoguessr-web) | Web for players / Swift and Hummingbird |
 | [vinoguessr-infrastructure](https://github.com/vinoguessr/vinoguessr-infrastructure) | Terraform / Google Cloud Run / Cloudflare / OpenTelemetry |
-| [vinoguessr-docs](https://github.com/vinoguessr/vinoguessr-docs) | 設計書 / ADR / Wiki |
-| [.github](https://github.com/vinoguessr/.github) | 共通設定・テンプレート・Actions |
+| [vinoguessr-docs](https://github.com/vinoguessr/vinoguessr-docs) | Design documents / ADRs / wiki |
+| [.github](https://github.com/vinoguessr/.github) | Shared settings, templates, and Actions |
 
-ログインはPasskeyとメールのワンタイムコードです。ユーザー・イベント・問題・回答・採点の正本はVinoGuessr APIとPostgreSQLです。
+Sign-in uses passkeys and email one-time codes. The VinoGuessr API and PostgreSQL are the source of truth for users, events, questions, answers, and scores.
 
-開発前に [AGENTS.md](AGENTS.md) と [CONTRIBUTING.md](CONTRIBUTING.md) を読み、Issueの依存関係を満たしてからブランチとPRで変更します。実装中は独立Review Agentを並行起動します。レビューはGitHubのCodexで行い、Codexの利用上限でレビューを得られないときだけClaude Codeのレビューで代替します（[レビュー方針](policies/github-codex-review.md)）。
+Before developing, read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md), satisfy the Issue's dependencies, and change things through a branch and a PR. Run an independent Review Agent in parallel while implementing. PRs are reviewed by GitHub Codex; only when Codex cannot review because of its usage limit does a Claude Code review substitute ([review policy](policies/github-codex-review.md)).
 
-共通ファイルは自動継承されるとは限りません。`AGENTS.md`・`CLAUDE.md`・CODEOWNERS・CI・ライセンスは各リポジトリに明示配置し、共通規則の改訂時は追従PRで更新します。Reusable Workflowはレビュー済みのコミットSHAを指定して呼び出します。
+Shared files are not necessarily inherited. `AGENTS.md`, `CLAUDE.md`, CODEOWNERS, CI, and the license are placed explicitly in each repository and updated through follow-up PRs when the shared rules change. Reusable workflows are called by a reviewed commit SHA.
 
-SwiftUIを実装する`vinoguessr-app`には、[専用指針](policies/swiftui.md)の本文と適用元commitをAGENTSへ明示配置します。この指針は文書だけでUI動作・性能検証を完了扱いにしません。
+`vinoguessr-app`, which implements SwiftUI, carries the body of the [SwiftUI policy](policies/swiftui.md) and its source commit in its AGENTS.md. The policy document alone never counts as verifying UI behavior or performance.
 
-この構成は [sauna-studio/.github](https://github.com/sauna-studio/.github) を基にしています。
+Code and documentation are written in English; Issue and PR bodies are written in Japanese.
 
-ローカル検証（Python 3.11以上を使用。macOS標準Pythonが古い場合はHomebrew等のPythonを明示指定）:
+This structure is based on [sauna-studio/.github](https://github.com/sauna-studio/.github).
+
+Local verification (Python 3.11 or later; if the macOS system Python is older, use one from Homebrew or similar):
 
 ```sh
 python3 -m venv /tmp/vinoguessr-foundation-venv
@@ -33,6 +35,6 @@ python3 -m venv /tmp/vinoguessr-foundation-venv
 actionlint
 ```
 
-これは本番デプロイや課金リソース作成を行うリポジトリではありません。GitHub上の設定の適用には [bootstrap/provision.py](bootstrap/provision.py) を使い、結果と未完了事項は [docs/setup-report.md](docs/setup-report.md) に残します。
+This repository does not deploy to production or create billed resources. GitHub settings are applied with [bootstrap/provision.py](bootstrap/provision.py), and the results and open items are recorded in [docs/setup-report.md](docs/setup-report.md).
 
 - [Workflow dependency lockfiles](policies/workflow-lockfiles.md): generated coverage and provenance verification alongside existing SHA pins.

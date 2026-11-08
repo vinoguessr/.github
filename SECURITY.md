@@ -1,7 +1,7 @@
 # Security policy
 
-現在は開発初期段階です。本番サービスやセキュリティ対応SLAはまだ提供していません。
+VinoGuessr is in early development. There is no production service or security response SLA yet.
 
-機密情報を含む脆弱性を公開Issueに投稿しないでください。対象リポジトリでPrivate vulnerability reportingが有効な場合はGitHubの **Security → Report a vulnerability** を使用してください。未提供の場合はOrganization管理者が非公開の報告経路を用意するまで、機密の詳細を公開しないでください。
+Do not post vulnerabilities that include sensitive information in public Issues. If private vulnerability reporting is enabled for the repository, use GitHub's **Security → Report a vulnerability**. If it is not available, do not disclose sensitive details publicly until an organization administrator provides a private reporting channel.
 
-報告には対象commit、影響範囲、匿名化した再現方法を含めます。実際の認証情報・利用者データは含めません。
+Include the affected commit, the impact, and anonymized reproduction steps. Do not include real credentials or user data.

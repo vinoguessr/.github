@@ -30,7 +30,7 @@ Prefer property-granular `@Observable` models and small dependency boundaries. A
 
 Default to an exhaustive `Hashable` route enum with stable IDs and `[Route]`; use `NavigationPath` when heterogeneous types are needed. Own the router at its scope and inject through `@Environment`. Modernize legacy wrappers. Never derive a retroactive `Binding: Hashable` from mutable wrapped values. [User reference](https://zenn.dev/zunda_pixel/articles/ebf2a079cbf68b)
 
-Own routers per scene/account/profile; key private presentation caches by environment/facility too. Clear authenticated presentation on logout, revocation or identity changes; discard late results from a previous identity/scope. Keep token/CSRF handling in the existing session layer, not UI state or navigation persistence. Routes contain IDs, not credentials or full private models. Authorized display models remain allowed. Restored IDs/deep links require API authorization; UI state grants no access. Preserve redacted errors.
+Own routers per scene/account/profile; key private presentation caches by environment/account/event too. Clear authenticated presentation on logout, revocation or identity changes; discard late results from a previous identity/scope. Keep token/CSRF handling in the existing session layer, not UI state or navigation persistence. Routes contain IDs, not credentials or full private models. Authorized display models remain allowed. Restored IDs/deep links require API authorization; UI state grants no access. Preserve redacted errors.
 
 ### Actions and toolbars
 

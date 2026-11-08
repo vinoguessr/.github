@@ -20,6 +20,39 @@ WorkflowLoader.yaml_implicit_resolvers = {
     for key, values in yaml.SafeLoader.yaml_implicit_resolvers.items()
 }
 
+REVIEW_AGENT_TOOLS = {"Read", "Grep", "Glob", "Bash"}
+# CodeQL needs to upload results; no other job may be granted write access.
+JOB_WRITE_ALLOWLIST = {"security-events"}
+
+
+def trigger_events(on: object) -> set[str]:
+    """Workflow `on:` may be a string, a list, or a mapping."""
+    if isinstance(on, str):
+        return {on}
+    if isinstance(on, list):
+        return {str(event) for event in on}
+    if isinstance(on, dict):
+        return {str(event) for event in on}
+    return set()
+
+
+def job_permissions_are_safe(permissions: object) -> bool:
+    if isinstance(permissions, str):
+        return permissions == "read-all"
+    if isinstance(permissions, dict):
+        return all(value in ("read", "none") or (value == "write" and scope in JOB_WRITE_ALLOWLIST)
+                   for scope, value in permissions.items())
+    return False
+
+
+def agent_tools(value: object) -> set[str]:
+    """Claude Code agent `tools:` may be a comma-separated string or a YAML list."""
+    if isinstance(value, str):
+        return {tool.strip() for tool in value.split(",") if tool.strip()}
+    if isinstance(value, list):
+        return {str(tool).strip() for tool in value if str(tool).strip()}
+    return set()
+
 
 def validate(root: Path) -> list[str]:
     errors: list[str] = []
@@ -56,10 +89,12 @@ def validate(root: Path) -> list[str]:
             errors.append(f"Invalid agent frontmatter {p.name}: {exc}")
             continue
         require(isinstance(meta, dict) and meta.get("name") and meta.get("description"), f"Missing agent name/description: {p.name}")
-        tools = {t.strip() for t in str((meta or {}).get("tools", "")).split(",") if t.strip()}
-        require(bool(tools) and not tools & {"Write", "Edit", "NotebookEdit"}, f"Review agent must declare read-only tools: {p.name}")
+        tools = agent_tools(meta.get("tools") if isinstance(meta, dict) else None)
+        # An allowlist, not a denylist: new write-capable or MCP tools must not slip into a reviewer.
+        require(bool(tools) and tools <= REVIEW_AGENT_TOOLS, f"Review agent tools must be a subset of {sorted(REVIEW_AGENT_TOOLS)}: {p.name}")
 
-    for p in sorted((root / ".github").rglob("*.yml")):
+    workflow_files = sorted([*(root / ".github").rglob("*.yml"), *(root / ".github").rglob("*.yaml")])
+    for p in workflow_files:
         try:
             data = yaml.load(p.read_text(), Loader=WorkflowLoader)
         except yaml.YAMLError as exc:
@@ -71,11 +106,12 @@ def validate(root: Path) -> list[str]:
         if p.parent.name == "workflows":
             require("on" in data and "jobs" in data, f"Missing workflow trigger/jobs: {p.name}")
             require(data.get("permissions") == {"contents": "read"}, f"Workflow must default to contents:read: {p.name}")
-            trigger = data.get("on", {})
-            require(not isinstance(trigger, dict) or "pull_request_target" not in trigger, f"Unsafe trigger: {p.name}")
-            for job in data.get("jobs", {}).values():
+            require("pull_request_target" not in trigger_events(data.get("on")), f"Unsafe trigger: {p.name}")
+            for job_id, job in (data.get("jobs") or {}).items():
                 if "uses" not in job:
                     require("timeout-minutes" in job, f"Missing job timeout: {p.name}")
+                if "permissions" in job:
+                    require(job_permissions_are_safe(job["permissions"]), f"Job permissions too broad: {p.name}: {job_id}")
                 uses = [job["uses"]] if "uses" in job else []
                 for step in job.get("steps", []):
                     if "uses" in step:

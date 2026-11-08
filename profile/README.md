@@ -1,9 +1,9 @@
 # VinoGuessr
 
-グラスの中のワインを、当てて楽しむ。
+Taste the wine in the glass, and guess what it is.
 
-ワインのブラインドテイスティングを、イベントの作成・出題・回答・採点・シーズンレーティングで遊べるサービスを開発しています。
+We are building a service for blind wine tasting: create events, set questions, answer them, get scored, and climb the season rating.
 
-Swift / SwiftUI / Hummingbird / PostgreSQL / Google Cloud / Cloudflareを採用し、Passkey認証、Apple Walletのイベント参加証、OpenTelemetryを組み合わせます。
+Built with Swift / SwiftUI / Hummingbird / PostgreSQL / Google Cloud / Cloudflare, combining passkey sign-in, Apple Wallet event tickets, and OpenTelemetry.
 
-開発基盤・規則は [.github](https://github.com/vinoguessr/.github)、設計・ADRは [vinoguessr-docs](https://github.com/vinoguessr/vinoguessr-docs) を参照してください。
+See [.github](https://github.com/vinoguessr/.github) for the development foundation and rules, and [vinoguessr-docs](https://github.com/vinoguessr/vinoguessr-docs) for design and ADRs.

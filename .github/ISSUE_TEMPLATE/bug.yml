@@ -1,6 +1,7 @@
 name: バグ報告
 description: 再現・期待動作・回帰テストを追跡する
 title: "[Bug] "
+labels: ["type:bug"]
 body:
   - type: textarea
     id: reproduction

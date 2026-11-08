@@ -1,14 +1,15 @@
 # Contributing
 
-最初に [AGENTS.md](AGENTS.md) を読みます。Issueと依存関係を確認し、`codex/<topic>`ブランチで実装してください。`main`へ直接pushしません。
+Read [AGENTS.md](AGENTS.md) first. Check the Issue and its dependencies, and implement on a `codex/<topic>` branch. Never push directly to `main`.
 
-- 重複Issueを検索し、受け入れ条件・依存関係・対象リポジトリを記録します。
-- 実装中に独立Review Agentを並行起動します。認証・個人情報・イベントの参加権限・採点・Apple Walletパスの署名はSecurity Review Agentも起動します。
-- 動作するビルド・テストとGitHub Actionsの結果をPRに記録します。未実行・利用不能なMCPも明記します。
-- バグ修正には再現と回帰テストを含め、指摘修正後に再レビューします。
-- PRはGitHubのCodexでレビューします。Codexの利用上限でレビューを得られないときだけ、Claude Codeのレビューで代替し、その根拠をPRに記録します。
-- 設計判断はADR、索引はWiki、反復する教訓はAGENTS.mdに反映します。
+- Search for duplicate Issues and record acceptance criteria, dependencies, and the target repository.
+- Run an independent Review Agent in parallel while implementing. Also run a Security Review Agent for authentication, personal data, event participation authorization, scoring, and Apple Wallet pass signing.
+- Record working builds, tests, and GitHub Actions results in the PR. Also state any MCP servers that were not run or not available.
+- Bug fixes include a reproduction and a regression test, and are re-reviewed after fixing findings.
+- PRs are reviewed by GitHub Codex. Only when Codex cannot review because of its usage limit, substitute a Claude Code review and record the evidence in the PR.
+- Record design decisions in ADRs, the index in the wiki, and recurring lessons in AGENTS.md.
+- Write code and documentation in English, and Issue and PR bodies in Japanese.
 
-Reusable Workflowsの更新はすべての呼出先に自動適用されません。呼出しはコミットSHAに固定し、検証後に追従PRを作成してください。
+Updates to reusable workflows are not applied to every caller automatically. Pin calls to a commit SHA, and open follow-up PRs after verification.
 
-このリポジトリではREADMEのコマンドと`actionlint`を実行します。Issue Formのラベルを使う場合は対象リポジトリで先に作成してください。CODEOWNERS・AGENTS.md・CLAUDE.md・workflowはOrganization共通設定だけでは継承されません。
+In this repository, run the commands in the README and `actionlint`. If an Issue Form uses labels, create them in the target repository first. CODEOWNERS, AGENTS.md, CLAUDE.md, and workflows are not inherited from the organization's shared settings.

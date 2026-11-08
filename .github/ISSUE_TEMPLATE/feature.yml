@@ -1,6 +1,7 @@
 name: 実装タスク
 description: 受け入れ条件と依存関係を持つ実装・基盤タスク
 title: "[Task] "
+labels: ["type:task"]
 body:
   - type: textarea
     id: outcome

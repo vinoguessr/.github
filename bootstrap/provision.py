@@ -6,7 +6,9 @@ Reads gh's existing auth; never reads tokens. Run one stage at a time:
   --stage project   create/find the Organization Project, its fields, and repo links
   --stage items     add open Issues of every repo to the Project and set Area
   --stage settings  repository merge/security settings, empty Environments, labels
-  --stage rulesets  protect main with PR + required CI checks (run after checks exist)
+  --stage rulesets  protect main with PR + required CI checks (refuses until the checks have run)
+
+Add --repo <name> (repeatable) to limit a stage to some repositories.
 
 Repo contents always change through PRs; this script only touches GitHub settings.
 Only allowlisted VinoGuessr repositories may be mutated.
@@ -41,9 +43,12 @@ LABELS = [
 RULESET_NAME = 'Main PR and verified CI'
 GITHUB_ACTIONS_APP_ID = 15368
 # Check names as reported by GitHub Actions. A check that has never run on the
-# repository blocks every merge, so rulesets are applied only after these exist.
+# repository blocks every merge, so the rulesets stage refuses to apply a ruleset
+# until every required check has been seen on main or a recent PR.
 # Path-filtered workflows (vinoguessr-api Atlas `diff`) are not required: a PR that
 # does not touch those paths would never report the check and could not merge.
+# vinoguessr-web replaces its old ci.yml with the `swift` job in repository.yml, and
+# vinoguessr-infrastructure adds the `terraform` job once Terraform is moved in.
 REQUIRED_CHECKS = {
     '.github': ['Foundation validation', 'Analyze Python tooling', 'Verify action dependency provenance'],
     'vinoguessr-api': ['policy / Repository policy', 'Verify action dependency provenance', 'lint', 'test', 'docker-build'],
@@ -128,8 +133,9 @@ def ruleset_payload(checks):
     }
 
 
-def project(state):
-    projects = gh('project', 'list', '--owner', ORG, '--format', 'json', '--limit', '100')['projects']
+def project(state, repos):
+    # --closed includes closed projects, so a closed "VinoGuessr" is reused instead of duplicated.
+    projects = gh('project', 'list', '--owner', ORG, '--closed', '--format', 'json', '--limit', '100')['projects']
     matches = [p for p in projects if p['title'] == PROJECT_TITLE]
     if len(matches) > 1:
         raise RuntimeError('Ambiguous existing project')
@@ -142,27 +148,53 @@ def project(state):
         if name not in [f['name'] for f in fields]:
             gh('project', 'field-create', n, '--owner', ORG, '--name', name, '--data-type', 'SINGLE_SELECT',
                '--single-select-options', ','.join(options), '--format', 'json')
-    for repo in REPOS:
+    for repo in repos:
         gh('project', 'link', n, '--owner', ORG, '--repo', f'{ORG}/{repo}')
     print(p['url'], flush=True)
 
 
-def items(state):
+def area_option(area_field, repo):
+    name = AREA_BY_REPO[repo]
+    for option in area_field['options']:
+        if option['name'] == name:
+            return option
+    raise RuntimeError(f'Area field has no option {name!r}; add it to the Project before rerunning')
+
+
+def project_item(number, url, cache):
+    if url in cache:
+        return cache[url]
+    try:
+        item = gh('project', 'item-add', number, '--owner', ORG, '--url', url, '--format', 'json')
+    except RuntimeError as error:
+        if 'Content already exists' not in str(error):
+            raise
+        # GitHub can commit an add before returning a duplicate response; reread the list.
+        items = gh('project', 'item-list', number, '--owner', ORG, '--limit', '1000', '--format', 'json')['items']
+        cache.update({i['content']['url']: i for i in items if i.get('content', {}).get('url')})
+        if url not in cache:
+            raise
+        return cache[url]
+    cache[url] = item
+    return item
+
+
+def items(state, repos):
     n = str(state['project']['number'])
     fields = gh('project', 'field-list', n, '--owner', ORG, '--format', 'json', '--limit', '100')['fields']
     area = next(f for f in fields if f['name'] == 'Area')
     existing = gh('project', 'item-list', n, '--owner', ORG, '--limit', '1000', '--format', 'json')['items']
-    by_url = {i['content']['url']: i for i in existing if i.get('content', {}).get('url')}
+    cache = {i['content']['url']: i for i in existing if i.get('content', {}).get('url')}
     state.setdefault('items', {})
-    for repo in REPOS:
+    for repo in repos:
+        option = area_option(area, repo)
         for issue in pages(f'repos/{ORG}/{repo}/issues?state=open'):
             if 'pull_request' in issue:
                 continue
             url = issue['html_url']
-            item = by_url.get(url) or gh('project', 'item-add', n, '--owner', ORG, '--url', url, '--format', 'json')
+            item = project_item(n, url, cache)
             # Existing Area values (including manual edits) are never overwritten on reruns.
             if not item.get('area'):
-                option = next(o for o in area['options'] if o['name'] == AREA_BY_REPO[repo])
                 gh('project', 'item-edit', '--project-id', state['project']['id'], '--id', item['id'],
                    '--field-id', area['id'], '--single-select-option-id', option['id'])
             state['items'][url] = item['id']
@@ -170,9 +202,9 @@ def items(state):
             print('item', url, flush=True)
 
 
-def settings(state):
+def settings(state, repos):
     state.setdefault('settings', {})
-    for repo in REPOS:
+    for repo in repos:
         path = f'repos/{ORG}/{repo}'
         record = state['settings'].setdefault(repo, {})
         api(path, 'PATCH', repository_settings())
@@ -194,24 +226,48 @@ def settings(state):
         print('settings', repo, flush=True)
 
 
-def rulesets(state):
+def observed_checks(repo, recent_prs=10):
+    """Check-run names seen on main and on the heads of the most recently updated PRs."""
+    shas = [api(f'repos/{ORG}/{repo}/commits/main')['sha']]
+    prs = api(f'repos/{ORG}/{repo}/pulls?state=all&sort=updated&direction=desc&per_page={recent_prs}')
+    shas += [pr['head']['sha'] for pr in prs]
+    names = set()
+    for sha in dict.fromkeys(shas):
+        runs = api(f'repos/{ORG}/{repo}/commits/{sha}/check-runs?per_page=100')['check_runs']
+        names |= {run['name'] for run in runs if run.get('app', {}).get('id') == GITHUB_ACTIONS_APP_ID}
+    return names
+
+
+def missing_checks(repo):
+    return [c for c in REQUIRED_CHECKS[repo] if c not in observed_checks(repo)]
+
+
+def rulesets(state, repos):
     state.setdefault('rulesets', {})
-    for repo in REPOS:
+    blocked = {repo: missing for repo in repos if (missing := missing_checks(repo))}
+    if blocked:
+        raise RuntimeError(f'Required checks have not run yet, refusing to apply rulesets: {blocked}')
+    for repo in repos:
         path = f'repos/{ORG}/{repo}/rulesets'
         payload = ruleset_payload(REQUIRED_CHECKS[repo])
-        current = [r for r in api(path) if r['name'] == RULESET_NAME]
+        # Organization-level rulesets are listed by default but cannot be updated through the repo endpoint.
+        current = [r for r in api(f'{path}?includes_parents=false') if r['name'] == RULESET_NAME]
         result = api(f'{path}/{current[0]["id"]}', 'PUT', payload) if current else api(path, 'POST', payload)
         state['rulesets'][repo] = {'id': result['id'], 'required_checks': REQUIRED_CHECKS[repo]}
         save(state)
         print('ruleset', repo, result['id'], flush=True)
 
 
+STAGES = {'project': project, 'items': items, 'settings': settings, 'rulesets': rulesets}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--stage', required=True, choices=['project', 'items', 'settings', 'rulesets'])
+    p.add_argument('--stage', required=True, choices=list(STAGES))
+    p.add_argument('--repo', action='append', choices=REPOS, help='Limit the stage to these repositories (repeatable)')
     args = p.parse_args()
     state = json.loads(STATE_PATH.read_text()) if STATE_PATH.exists() else {'organization': ORG}
-    globals()[args.stage](state)
+    STAGES[args.stage](state, list(dict.fromkeys(args.repo or REPOS)))
 
 
 if __name__ == '__main__':

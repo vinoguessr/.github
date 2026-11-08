@@ -1,78 +1,83 @@
-# VinoGuessr — 共通エージェント規則
+# VinoGuessr — Shared Agent Rules
 
-共通規則の正本: `vinoguessr/.github/AGENTS.md`。各リポジトリにはこの規則の実効的なコピーと固有の検証コマンドを配置する。リンクだけで規則が継承されると判断しない。
+The source of truth for these rules is `vinoguessr/.github/AGENTS.md`. Every repository carries an effective copy of these rules plus its own verification commands. Do not assume a link alone makes the rules apply.
 
-## 目的・アーキテクチャ
+## Writing language
 
-ワインのブラインドテイスティングを、イベントの作成・出題・回答・採点・シーズンレーティングで楽しめるサービスを開発する。ユーザー・イベント・問題・回答・採点などの業務データはVinoGuessr API / PostgreSQLを正本とし、外部サービスを正本にしない。
+Write code, documentation, commit messages, and labels in English. Write Issue bodies and PR bodies in Japanese. Issue Forms and the PR template stay in Japanese because they become the Issue and PR body.
 
-API: Swift 6 / Hummingbird / PostgreSQL / PostgresNIO / Valkey / Atlas / OpenAPI。Apple: SwiftUI、iOS・iPadOS・macOS 27.0以上。Web: Swift / Hummingbird。基盤: Terraform / Google Cloud Run / Cloudflare（DNS・Images・Email）/ Docker / OpenTelemetry。最新安定版OS・ブラウザを対象とし、不要な後方互換分岐を追加しない。
+## Purpose and architecture
 
-ログインはPasskey / WebAuthnとメールのワンタイムコードで行う。セッションはAPIが発行するトークンで扱い、クライアントが送る利用者IDやイベント参加状態を信用しない。画像はCloudflare Images、イベント参加証はApple Walletパスで提供する。
+VinoGuessr is a service for blind wine tasting: people create events, set questions, answer them, get scored, and build a season rating. The VinoGuessr API and PostgreSQL are the source of truth for users, events, questions, answers, and scores. External services are never the source of truth.
 
-## 実装フローと役割
+API: Swift 6 / Hummingbird / PostgreSQL / PostgresNIO / Valkey / Atlas / OpenAPI. Apple: SwiftUI, iOS, iPadOS, and macOS 27.0 or later. Web: Swift / Hummingbird. Infrastructure: Terraform / Google Cloud Run / Cloudflare (DNS, Images, Email) / Docker / OpenTelemetry. Target the latest stable OS and browser releases and do not add unnecessary backward-compatibility branches.
 
-1. Issue、受け入れ条件、Sub-issues、Dependencies、既存PRとADRを読み、重複とブロッカーを確認する。
-2. 実装計画を作る。Coding Agentが実装している間は、独立したReview Agentを必ず並行起動する。別コンテキストのレビューを用い、実装者自身の再読だけで代用しない。
-3. 認証（Passkey・メールのワンタイムコード・トークン）・個人情報・イベントの参加権限・採点結果の改ざん防止・Apple Walletパスの署名を変更する場合はSecurity Review Agentも並行起動する。Bug Triage Agentは再現・重複確認、Tool Review AgentはMCP・Skills・CIの権限と実行安全性を確認する。
-4. 指摘を修正し、実際にビルド・テスト・必要な動作検証を実行する。AIレビューのみで合格にしない。バグは重複を調べて必要ならIssueを作成し、回帰テストを追加する。
-5. 再レビュー後、GitHub Actionsの成功を確認し、PRに実装内容・検証・レビュー結果・未解決事項を記録する。未実行チェックを成功と表現しない。
+Sign-in uses passkeys (WebAuthn) and email one-time codes. Sessions use tokens issued by the API; never trust a user ID or event participation state sent by a client. Images are served through Cloudflare Images, and event tickets are Apple Wallet passes.
 
-並行エージェントが利用できない場合はその制約を記録し、レビュー条件を満たすまでマージしない。レビューは自動でGitHubの承認票になるわけではない。
+## Implementation flow and roles
 
-## コーディング・テスト
+1. Read the Issue, acceptance criteria, sub-issues, dependencies, existing PRs, and ADRs. Check for duplicates and blockers.
+2. Make an implementation plan. While the Coding Agent implements, always run an independent Review Agent in parallel. Use a review from a separate context; the implementer re-reading its own work does not count.
+3. When a change touches authentication (passkeys, email one-time codes, tokens), personal data, event participation authorization, scoring integrity, or Apple Wallet pass signing, also run a Security Review Agent in parallel. The Bug Triage Agent reproduces bugs and checks for duplicates; the Tool Review Agent checks permissions and execution safety of MCP servers, Skills, and CI.
+4. Fix findings and actually run builds, tests, and any required runtime checks. Never pass a change on AI review alone. For bugs, search for duplicates, open an Issue if needed, and add a regression test.
+5. After re-review, confirm GitHub Actions succeeded, and record the implementation, verification, review results, and open items in the PR. Never describe an unrun check as passing.
 
-既存構成を尊重し、小さいIssue単位の変更にする。Swiftの並行性はSwift 6の検査を有効にし、無根拠な`@unchecked Sendable`やエラー握り潰しを避ける。公開APIはOpenAPIで契約を明示し、生成物を手編集しない。DB変更はAtlasのバージョン管理されたforward-only migrationと統合テストを伴う。
+If parallel agents are unavailable, record that constraint and do not merge until the review conditions are met. A review does not automatically become a GitHub approval.
 
-APIは`swift build` / `swift test`とPostgreSQL・Valkeyを使う統合テスト、Atlas migrationの検証、Webは`swift build` / `swift test`、Appleは対象Xcodeでbuild/testと必要なSimulator動作確認、Terraformはfmt / init -backend=false / validateを実行する。コード未配置の基盤PRは構造検査だけを実行し、アプリ検証済みと記録しない。
+## Coding and testing
 
-`.github`リポジトリで共通基盤を変更するときの検証は`python scripts/validate_repository.py`（Python 3.11以上、`scripts/validation-requirements.txt`を使用）、`python -m unittest discover -s scripts -p 'test_*.py'`、`actionlint`。他のリポジトリでは末尾の固有指針とREADMEにある実在する検証手順を使う。Reusable Workflowsは呼出先の実コード・lockfile・テストが存在してから有効化する。
+Respect the existing structure and keep changes small and scoped to one Issue. Enable Swift 6 concurrency checking and avoid unjustified `@unchecked Sendable` or swallowed errors. Define public APIs in OpenAPI first and never hand-edit generated code. Database changes come with a versioned, forward-only Atlas migration and integration tests.
 
-## 記述の責務
+For the API run `swift build` / `swift test` with integration tests against PostgreSQL and Valkey, and verify Atlas migrations. For the web run `swift build` / `swift test`. For Apple run build/test with the target Xcode and check required flows in the Simulator. For Terraform run `fmt` / `init -backend=false` / `validate`. A foundation PR without code runs structural checks only and must not be recorded as app-verified.
 
-- **コードには How**：実装方法をコードの構造・名前・処理で表現する。
-- **テストコードには What**：期待する振る舞いと保証する結果を示す。
-- **コミットログには Why**：変更が必要な理由と解決する問題を記録する。
-- **コードコメントには Why not**：代替案を採用しない理由と必要な制約を説明する。
+When changing the shared foundation in the `.github` repository, verify with `python scripts/validate_repository.py` (Python 3.11 or later, using `scripts/validation-requirements.txt`), `python -m unittest discover -s scripts -p 'test_*.py'`, and `actionlint`. Other repositories use the repository-specific section at the end of their AGENTS.md and the real verification steps in their README. Enable reusable workflows only after the calling repository actually has the code, lockfile, and tests.
 
-## ワークアラウンドの追跡
+## What each artifact explains
 
-不具合・制約を暫定的に回避する実装や運用を導入した場合は、関連Issueの重複を確認し、既存Issueへ追記するか、無ければ追跡Issueを作成する。恒久的な設計や妥当な設定を、根拠なく暫定対処と扱わない。
+- **Code explains how**: express the implementation through structure, names, and logic.
+- **Tests explain what**: state the expected behavior and the guaranteed result.
+- **Commit messages explain why**: record why the change is needed and which problem it solves.
+- **Code comments explain why not**: explain why alternatives were rejected and which constraints apply.
 
-追跡Issueには導入理由、影響範囲、該当コード・PR、恒久対応案、解消・削除条件、上流Issue/PR（該当する場合）、再確認の契機、回帰検証を記録する。必要なコード箇所にはWhy notコメントで制約とIssue参照を残し、導入PRからも追跡Issueを参照する。
+## Tracking workarounds
 
-導入PRでは追跡Issueを自動closeする記法を使わず参照する。恒久対応または回避策が不要になったことを、解消条件と回帰検証で確認してから追跡Issueを閉じる。
+When you introduce an implementation or operation that temporarily works around a defect or constraint, check for related Issues and either add to an existing one or open a tracking Issue. Do not label a permanent design or a reasonable setting as a workaround without evidence.
 
-## セキュリティ
+A tracking Issue records why it was introduced, the impact, the affected code and PR, the permanent fix, the condition for removing it, upstream Issues/PRs if any, when to recheck, and the regression check. Leave a why-not comment with the constraint and the Issue reference at the relevant code, and reference the tracking Issue from the introducing PR.
 
-Secrets、トークン、個人情報、実利用者データをコード・ログ・Issue・PRに残さない。認証情報の値を出力しない。Passkeyはchallenge・origin・RP IDの対応を検証し、ワンタイムコードとトークン発行には試行回数制限をかける。イベントの参加権限と回答・採点の書き込みは信頼できるセッションからAPIで検証し、採点結果をクライアントの値で確定しない。Apple Walletパスの署名鍵・証明書（`.p12`・`.p8`など）をリポジトリに置かない。
+The introducing PR references the tracking Issue without auto-close keywords. Close the tracking Issue only after the removal condition and the regression check confirm that the permanent fix landed or the workaround is no longer needed.
 
-課金リソースの作成・本番デプロイ・`terraform apply`・広いIAM付与は明示承認を得る。OpenTelemetryにPII・認証情報を含めない。Workflowは最小permissions、外部Actionsは完全なcommit SHA固定。共通Reusable WorkflowのSHAはdefault branch履歴上に保持されたcommitを使い、未merge branchのSHAを使わない。checkoutの資格情報を永続化しない。PRの未信頼コードを`pull_request_target`で実行しない。
+## Security
 
-## MCP・Skills
+Never leave secrets, tokens, personal data, or real user data in code, logs, Issues, or PRs. Never print credential values. Verify that a passkey's challenge, origin, and RP ID match, and rate-limit one-time code and token issuance. The API verifies event participation and every write of answers and scores against a trusted session, and never finalizes a score from a client-supplied value. Never commit Apple Wallet pass signing keys or certificates (`.p12`, `.p8`, and similar).
 
-開始時に実際に利用可能なMCP・Skills・CLIを確認する。GitHub CLI、PostgreSQL・Atlas、Xcode MCP・Simulator・SwiftUI Expert・Swift Build、Terraform・gcloudを目的に応じて使う。公式導入方法と利用条件を検証してからローカル導入する。システム設定・認証・権限を無断で拡大しない。接続できないものは代替コマンドと未検証項目を記録する。インストール済みと利用済みを区別する。
+Creating billed resources, production deploys, `terraform apply`, and broad IAM grants require explicit approval. Keep PII and credentials out of OpenTelemetry. Workflows use least-privilege permissions, and external actions are pinned to full commit SHAs. Shared reusable workflows are referenced by a SHA retained in the default branch history, never by an unmerged branch's SHA. Do not persist checkout credentials. Never run untrusted PR code with `pull_request_target`.
 
-## GitHub運用とドキュメント
+## MCP servers and Skills
 
-`codex/`ブランチとPRを使い、`main`へ直接pushしない。既存変更・リポジトリ・ライセンスを上書きしない。必要なGitHub Issues/Projectsへの更新以外の他者宛メッセージは明示指示がない限り送信しない。Issueは横断Projectへ追加し、受け入れ条件と実際の依存関係を記録する。秘密の脆弱性は公開Issueで扱わずSECURITY.mdに従う。
+At the start, check which MCP servers, Skills, and CLIs are actually available. Use the GitHub CLI, PostgreSQL and Atlas, Xcode MCP, the Simulator, SwiftUI Expert, Swift Build, Terraform, and gcloud as the task requires. Verify the official installation method and terms before installing anything locally. Do not expand system settings, authentication, or permissions without approval. Record unavailable tools along with the alternative command and what remains unverified. Distinguish installed from actually used.
 
-PRには関連Issue、何が変わるか、実行したチェックと結果、独立Review/Security Reviewの結果、既知の制限を記録する。required checksをskipで満たしたように装わない。Releasesはテスト済みcommitと変更点を持ち、Environmentsは開発・検証・本番の承認境界を分ける。Packagesは配布の必要が生じたときだけ使う。
+## GitHub operations and documentation
 
-重要な設計変更は`vinoguessr-docs`のADRに背景・決定・代替案・影響を残し、Wikiに索引を反映する。繰り返すバグや重要なレビュー指摘は必要に応じてこの規則と各repoのAGENTS.mdを更新する。共通規則の更新は他repoへの追従PRを作り、適用元のcommitを明示する。
+Use `codex/` branches and PRs; never push directly to `main`. Never overwrite existing changes, repositories, or licenses. Do not send messages to other people beyond the required GitHub Issue and Project updates unless explicitly asked. Add Issues to the cross-repository Project and record acceptance criteria and real dependencies. Handle confidential vulnerabilities through SECURITY.md, not public Issues.
 
-## コードレビューとマージ条件
+A PR records the related Issue, what changes, the checks run and their results, independent Review and Security Review results, and known limitations. Never fake required checks by skipping them. Releases have a tested commit and a changelog; Environments separate the approval boundaries of development, staging, and production. Use Packages only when there is something to distribute.
 
-1. PRの自動Codexレビューを確認する。指摘ごとに根拠を確認し、必要なコード修正・回帰テストを行う。
-2. 各レビューthreadに、修正内容・commit・検証結果を返信する。対応不要と判断した場合も理由を説明し、未解決事項を隠さない。
-3. 対応後にPRへ正確に `@codex review` とコメントし、新しいレビューを依頼する。最新commitに対するレビュー結果を待つ。
-4. 新しい指摘があれば同じ処理を繰り返す。GitHubのCodexが指摘なしと示し、未対応の指摘がなく、必須CIが成功した後だけマージする。
-5. レビュー未着・連携未設定・実行失敗は指摘なしと見なさない。原因と依頼URLを記録し、PRを開いたままにする。
+Record significant design changes as ADRs in `vinoguessr-docs` with context, decision, alternatives, and consequences, and update the wiki index. Update these rules and each repository's AGENTS.md when bugs recur or a review finding matters. When the shared rules change, open follow-up PRs in the other repositories and state the source commit.
 
-**Codexの利用上限（トークン不足）でレビューを得られない場合に限り、Claude Codeの独立レビューで代替できる。** 代替するときは次を守る。
+## Code review and merge conditions
 
-- 実装したエージェントとは別のコンテキストで、Claude Codeの`reviewer`エージェント（`.claude/agents/reviewer.md`）を最新commitに対して起動する。手順3のSecurity Review対象の変更では`security-reviewer`も起動する。
-- Codexが使えなかった根拠（上限の表示・依頼したコメントのURL）、レビューしたcommit、指摘と対応をPRに記録する。
-- 指摘を修正したら、最新commitに対して再度レビューし、指摘がなくなり必須CIが成功してからマージする。
+1. Check the automatic Codex review on the PR. Verify the basis of each finding and make the required code fixes and regression tests.
+2. Reply to each review thread with the fix, the commit, and the verification result. If no change is needed, explain why and do not hide open items.
+3. After addressing findings, comment exactly `@codex review` on the PR to request a new review, and wait for the review of the latest commit.
+4. Repeat for any new findings. Merge only after GitHub Codex reports no findings, no findings remain unaddressed, and the required CI has passed.
+5. A missing review, a missing integration, or a failed run does not mean "no findings". Record the cause and the request URL, and keep the PR open. A passing independent local Review Agent does not replace this condition; the only exception is the usage-limit substitute below.
 
-このGitHub上のレビューは、実装中の独立Review Agent並行起動と実ビルド・テストに追加する確認である。レビュー依頼だけで成功扱いにしない。自動返信・同じ依頼の連投を避け、レビューroundと対象commitをPRへ記録する。
+**Only when Codex cannot review because of its usage limit (insufficient tokens), a Claude Code independent review may substitute.** When substituting:
+
+- After Codex reports its usage limit, run Claude Code's `reviewer` agent (`.claude/agents/reviewer.md`) as a separate run against the latest commit, in a context separate from the implementing agent. A review run during implementation never counts as the substitute. For changes to authentication, personal data, event participation authorization, scoring, or Apple Wallet pass signing, also run `security-reviewer`.
+- Record in the PR the evidence that Codex was unavailable (the limit message and the URL of the request comment), the reviewed commit, and the findings and fixes.
+- After fixing findings, review the latest commit again, and merge only once there are no findings and the required CI has passed.
+- Reasons other than the usage limit (no response, missing integration, failed run) do not qualify for substitution. Investigate and record the cause, and keep the PR open.
+
+This GitHub review is in addition to the independent Review Agent running in parallel during implementation and to real builds and tests. Requesting a review does not count as passing. Avoid automated replies and repeated identical requests, and record each review round and its commit in the PR.

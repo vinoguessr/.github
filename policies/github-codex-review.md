@@ -1,18 +1,18 @@
-## コードレビューとマージ条件
+## Code review and merge conditions
 
-1. PRの自動Codexレビューを確認する。指摘ごとに根拠を確認し、必要なコード修正・回帰テストを行う。
-2. 各レビューthreadに、修正内容・commit・検証結果を返信する。対応不要と判断した場合も理由を説明し、未解決事項を隠さない。
-3. 対応後にPRへ正確に `@codex review` とコメントし、新しいレビューを依頼する。最新commitに対するレビュー結果を待つ。
-4. 新しい指摘があれば同じ処理を繰り返す。GitHubのCodexが指摘なしと示し、未対応の指摘がなく、必須CIが成功した後だけマージする。
-5. レビュー未着・連携未設定・実行失敗は指摘なしと見なさない。原因と依頼URLを記録し、PRを開いたままにする。
+1. Check the automatic Codex review on the PR. Verify the basis of each finding and make the required code fixes and regression tests.
+2. Reply to each review thread with the fix, the commit, and the verification result. If no change is needed, explain why and do not hide open items.
+3. After addressing findings, comment exactly `@codex review` on the PR to request a new review, and wait for the review of the latest commit.
+4. Repeat for any new findings. Merge only after GitHub Codex reports no findings, no findings remain unaddressed, and the required CI has passed.
+5. A missing review, a missing integration, or a failed run does not mean "no findings". Record the cause and the request URL, and keep the PR open. A passing independent local Review Agent does not replace this condition; the only exception is the usage-limit substitute below.
 
-### Codexの利用上限に達したときの代替
+### Substitute review when Codex hits its usage limit
 
-Codexの利用上限（トークン不足）でレビューを得られない場合に限り、Claude Codeの独立レビューで代替できる。代替するときは次を守る。
+Only when Codex cannot review because of its usage limit (insufficient tokens), a Claude Code independent review may substitute. When substituting:
 
-- 実装したエージェントとは別のコンテキストで、Claude Codeの`reviewer`エージェント（`.claude/agents/reviewer.md`）を最新commitに対して起動する。認証・個人情報・イベントの参加権限・採点・Apple Walletパスの署名を変更するPRでは`security-reviewer`も起動する。
-- Codexが使えなかった根拠（上限の表示・依頼したコメントのURL）、レビューしたcommit、指摘と対応をPRに記録する。
-- 指摘を修正したら、最新commitに対して再度レビューし、指摘がなくなり必須CIが成功してからマージする。
-- 上限以外の理由（未着・連携未設定・実行失敗）は代替の対象にしない。原因を調べて記録し、PRを開いたままにする。
+- After Codex reports its usage limit, run Claude Code's `reviewer` agent (`.claude/agents/reviewer.md`) as a separate run against the latest commit, in a context separate from the implementing agent. A review run during implementation never counts as the substitute. For PRs that change authentication, personal data, event participation authorization, scoring, or Apple Wallet pass signing, also run `security-reviewer`.
+- Record in the PR the evidence that Codex was unavailable (the limit message and the URL of the request comment), the reviewed commit, and the findings and fixes.
+- After fixing findings, review the latest commit again, and merge only once there are no findings and the required CI has passed.
+- Reasons other than the usage limit (no response, missing integration, failed run) do not qualify for substitution. Investigate and record the cause, and keep the PR open.
 
-このGitHub上のレビューは、実装中の独立Review Agent並行起動と実ビルド・テストに追加する確認である。レビュー依頼だけで成功扱いにしない。自動返信・同じ依頼の連投を避け、レビューroundと対象commitをPRへ記録する。
+This GitHub review is in addition to the independent Review Agent running in parallel during implementation and to real builds and tests. Requesting a review does not count as passing. Avoid automated replies and repeated identical requests, and record each review round and its commit in the PR.

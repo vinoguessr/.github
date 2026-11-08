@@ -1,29 +1,32 @@
-# VinoGuessr 開発基盤の構築記録
+# VinoGuessr foundation setup report
 
-[sauna-studio](https://github.com/sauna-studio/.github) と同じ構成への移行を記録します。完了した項目だけを完了として書き、未実施・未検証の項目は残件に書きます。
+This report records the move to the same structure as [sauna-studio](https://github.com/sauna-studio/.github). Only finished items are listed as done; anything not yet run or verified is listed under open items.
 
-## 方針
+## Decisions
 
-- リポジトリ: `vinoguessr-api` / `vinoguessr-app` / `vinoguessr-web` に、`.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` を追加する
-- エージェント: Codexを前提にし、Codexの利用上限でレビューを得られないときだけClaude Codeのレビューで代替する
-- Web: 技術スタックはSwift / Hummingbirdのまま変えない
-- Google Cloud: 新しいプロジェクト `vinoguessr` は、この基盤とinfrastructureリポジトリを整えた後にIssueとPRの流れで構築する
+- Repositories: add `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` to `vinoguessr-api` / `vinoguessr-app` / `vinoguessr-web`
+- Agents: Codex by default; a Claude Code review substitutes only when Codex cannot review because of its usage limit
+- Web: keep the Swift / Hummingbird stack
+- Google Cloud: bootstrap the new project `vinoguessr` through Issues and PRs after this foundation and the infrastructure repository are in place
+- Language: code and documentation in English; Issue and PR bodies in Japanese
 
-## sauna-studio との違い
+## Differences from sauna-studio
 
-- 既存コードのある `vinoguessr-api` / `vinoguessr-web` には独自のCI（`ci.yml`）があるため、共通のRepository policy検査は `.github/workflows/repository.yml` から呼び出す
-- ADRは `vinoguessr-docs` だけに置き、`.github` には複製しない
-- Claude Codeの代替レビュー用に `CLAUDE.md` と `.claude/agents/` を各リポジトリへ配置する
-- 管理者向けアプリ・Web、automationリポジトリは作らない
+- `vinoguessr-api` already has its own CI (`ci.yml`), so the shared repository policy check is called from `.github/workflows/repository.yml` in every repository, and the api keeps its own `lint` / `test` / `docker-build` jobs as required checks
+- `vinoguessr-web` replaces its old `ci.yml` with a `swift` job in `repository.yml` that calls `reusable-swift.yml`
+- ADRs live only in `vinoguessr-docs` and are not duplicated in `.github`
+- `CLAUDE.md` and `.claude/agents/` are placed in every repository for Claude Code reviews
+- No admin app, admin web, or automation repositories
 
-## 完了
+## Done
 
-まだありません。
+- Created `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` as public repositories (2026-11-08)
+- Opened [vinoguessr/.github#1](https://github.com/vinoguessr/.github/pull/1) with the shared foundation
 
-## 残件
+## Open items
 
-- `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` の作成
-- 共通ファイルを各リポジトリへ配布するPR
-- `bootstrap/provision.py` による Project・設定・Ruleset の適用
-- Terraformをinfrastructureリポジトリへ移す
-- Google Cloud プロジェクト `vinoguessr` の構築
+- PRs distributing the shared files to each repository
+- Apply the Project, settings, and rulesets with `bootstrap/provision.py`
+- Move Terraform to the infrastructure repository
+- Bootstrap the Google Cloud project `vinoguessr`
+- The shared repository policy check does not yet enforce workflow hardening (SHA pinning, `permissions`, `persist-credentials`) in downstream repositories. The existing api and web workflows reference actions by tag; pin them in the distribution PRs, then decide whether to enforce it in `reusable-repository.yml`

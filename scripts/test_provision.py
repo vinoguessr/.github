@@ -1,5 +1,7 @@
 import importlib.util
 import unittest
+
+import yaml
 from pathlib import Path
 from unittest import mock
 
@@ -92,7 +94,7 @@ class ItemsStageTests(unittest.TestCase):
         with mock.patch.object(provision, 'gh', side_effect=fake_gh), \
                 mock.patch.object(provision, 'pages', side_effect=lambda path: issues[path]), \
                 mock.patch.object(provision, 'save'):
-            provision.items(state)
+            provision.items(state, provision.REPOS)
 
         added = [a for a in calls if a[:2] == ('project', 'item-add')]
         edited = [a for a in calls if a[:2] == ('project', 'item-edit')]
@@ -102,6 +104,113 @@ class ItemsStageTests(unittest.TestCase):
         self.assertIn('I3', edited[0])
         self.assertIn('O-api', edited[0])
         self.assertNotIn('https://github.com/vinoguessr/vinoguessr-api/pull/2', state['items'])
+
+
+def job_names(path):
+    data = yaml.load(path.read_text(), Loader=WorkflowLoader)
+    return {job.get('name', job_id) for job_id, job in data['jobs'].items()}
+
+
+class WorkflowLoader(yaml.SafeLoader):
+    pass
+
+
+WorkflowLoader.yaml_implicit_resolvers = {
+    key: [(tag, pattern) for tag, pattern in values if tag != 'tag:yaml.org,2002:bool']
+    for key, values in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+
+
+class RequiredCheckNameTests(unittest.TestCase):
+    """A renamed job silently blocks every merge, so required names must match the workflows."""
+
+    def test_foundation_checks_match_job_names(self):
+        names = set()
+        for path in (ROOT / '.github/workflows').glob('*.yml'):
+            if not path.name.startswith('reusable-'):
+                names |= job_names(path)
+        for check in provision.REQUIRED_CHECKS['.github']:
+            self.assertIn(check, names)
+
+    def test_reusable_check_suffixes_match_reusable_job_names(self):
+        reusable = {
+            'policy': ROOT / '.github/workflows/reusable-repository.yml',
+            'swift': ROOT / '.github/workflows/reusable-swift.yml',
+            'terraform': ROOT / '.github/workflows/reusable-terraform.yml',
+        }
+        for repo, checks in provision.REQUIRED_CHECKS.items():
+            for check in checks:
+                if ' / ' not in check:
+                    continue
+                caller, job = check.split(' / ', 1)
+                with self.subTest(repo=repo, check=check):
+                    self.assertIn(caller, reusable)
+                    self.assertIn(job, job_names(reusable[caller]))
+
+    def test_lockfile_check_matches_verify_workflow(self):
+        self.assertIn('Verify action dependency provenance', job_names(ROOT / '.github/workflows/verify-lockfile.yml'))
+
+
+class RulesetsStageTests(unittest.TestCase):
+    def run_stage(self, observed, existing):
+        calls = []
+
+        def fake_api(path, method='GET', data=None):
+            calls.append((method, path))
+            if path.endswith('/rulesets?includes_parents=false'):
+                return existing
+            if method in ('PUT', 'POST'):
+                return {'id': 99}
+            raise AssertionError(path)
+
+        with mock.patch.object(provision, 'observed_checks', return_value=observed), \
+                mock.patch.object(provision, 'api', side_effect=fake_api), \
+                mock.patch.object(provision, 'save'):
+            provision.rulesets({}, ['vinoguessr-docs'])
+        return calls
+
+    def test_refuses_when_a_required_check_has_not_run(self):
+        with mock.patch.object(provision, 'observed_checks', return_value={'policy / Repository policy'}), \
+                mock.patch.object(provision, 'api') as api:
+            with self.assertRaises(RuntimeError) as raised:
+                provision.rulesets({}, ['vinoguessr-docs'])
+        self.assertIn('Verify action dependency provenance', str(raised.exception))
+        api.assert_not_called()
+
+    def test_updates_existing_repository_ruleset(self):
+        observed = set(provision.REQUIRED_CHECKS['vinoguessr-docs'])
+        calls = self.run_stage(observed, [{'id': 7, 'name': provision.RULESET_NAME}])
+        self.assertIn(('PUT', 'repos/vinoguessr/vinoguessr-docs/rulesets/7'), calls)
+
+    def test_creates_ruleset_when_none_exists(self):
+        observed = set(provision.REQUIRED_CHECKS['vinoguessr-docs'])
+        calls = self.run_stage(observed, [{'id': 7, 'name': 'Other'}])
+        self.assertIn(('POST', 'repos/vinoguessr/vinoguessr-docs/rulesets'), calls)
+
+
+class ProjectItemTests(unittest.TestCase):
+    def test_recovers_when_github_reports_content_already_exists(self):
+        url = 'https://github.com/vinoguessr/vinoguessr-api/issues/1'
+
+        def fake_gh(*args, data=None):
+            if args[:2] == ('project', 'item-add'):
+                raise RuntimeError('project item-add: Content already exists in this project')
+            if args[:2] == ('project', 'item-list'):
+                return {'items': [{'id': 'I1', 'content': {'url': url}}]}
+            raise AssertionError(args)
+
+        with mock.patch.object(provision, 'gh', side_effect=fake_gh):
+            self.assertEqual(provision.project_item('1', url, {})['id'], 'I1')
+
+    def test_other_add_errors_propagate(self):
+        with mock.patch.object(provision, 'gh', side_effect=RuntimeError('project item-add: forbidden')):
+            with self.assertRaises(RuntimeError):
+                provision.project_item('1', 'https://github.com/vinoguessr/vinoguessr-api/issues/1', {})
+
+    def test_missing_area_option_names_the_option(self):
+        with self.assertRaises(RuntimeError) as raised:
+            provision.area_option({'options': [{'name': 'api', 'id': 'O'}]}, 'vinoguessr-docs')
+        self.assertIn("'docs'", str(raised.exception))
 
 
 if __name__ == '__main__':
