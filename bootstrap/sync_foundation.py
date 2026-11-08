@@ -14,8 +14,11 @@ the target repository through a PR.
   .gitignore (the baseline is appended), .github/dependabot.yml and LICENSE (created only when
   missing), and every other workflow (untouched).
 
-Afterwards run `gh actions-lock --no-narrow` in the target to regenerate actions.lock. Files
-removed from .github are not deleted from targets; remove them by hand in the follow-up PR.
+The target checkout must have no uncommitted changes, so nothing unrecoverable is overwritten.
+After writing, the script regenerates the target's actions.lock with `gh actions-lock --no-narrow`
+(requires `gh extension install github/gh-actions-lock --pin v0.4.0`), because the copied
+verify-lockfile.yml only verifies. Files removed from .github are not deleted from targets;
+remove them by hand in the follow-up PR.
 """
 import argparse
 import json
@@ -164,6 +167,23 @@ def gitignore_additions(lines):
     return additions
 
 
+def ensure_target_clean(target):
+    """Copies overwrite shared files; uncommitted edits there could not be recovered from Git."""
+    status = subprocess.run(['git', '-C', str(target), 'status', '--porcelain'], capture_output=True, text=True)
+    if status.returncode:
+        raise RuntimeError(f'{target} is not a git checkout: {status.stderr.strip()}')
+    if status.stdout.strip():
+        raise RuntimeError(f'{target} has uncommitted changes; commit or stash them before syncing')
+
+
+def regenerate_lockfile(target):
+    """verify-lockfile.yml is read-only, so the lockfile must cover the synced workflows before CI runs."""
+    result = subprocess.run(['gh', 'actions-lock', '--no-narrow'], cwd=target, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError('gh actions-lock --no-narrow failed (install it with '
+                           f'`gh extension install github/gh-actions-lock --pin v0.4.0`): {result.stderr.strip()}')
+
+
 def ensure_source_matches(source, sha):
     """The copied files must be exactly the commit named in the generated `Shared rules source` lines."""
     head = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'], capture_output=True, text=True)
@@ -239,7 +259,9 @@ def main():
     a = p.parse_args()
     ensure_durable(a.sha)
     ensure_source_matches(a.source.resolve(), a.sha)
+    ensure_target_clean(a.target.resolve())
     sync(a.source.resolve(), a.sha, a.repo, a.target.resolve())
+    regenerate_lockfile(a.target.resolve())
 
 
 if __name__ == '__main__':

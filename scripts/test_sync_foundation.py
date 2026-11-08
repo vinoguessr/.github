@@ -162,6 +162,48 @@ class EnsureSourceMatchesTests(unittest.TestCase):
             sync_foundation.ensure_source_matches(self.source, self.head)
 
 
+class TargetAndLockfileTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+        git = ['git', '-C', str(self.target), '-c', 'user.name=t', '-c', 'user.email=t@example.com']
+        subprocess.run(['git', 'init', '-q', str(self.target)], check=True)
+        (self.target / 'CLAUDE.md').write_text('committed')
+        subprocess.run(git + ['add', '-A'], check=True)
+        subprocess.run(git + ['commit', '-q', '-m', 'init'], check=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_accepts_a_clean_target(self):
+        sync_foundation.ensure_target_clean(self.target)
+
+    def test_rejects_uncommitted_edits_that_a_copy_would_overwrite(self):
+        (self.target / 'CLAUDE.md').write_text('local edit')
+        with self.assertRaises(RuntimeError):
+            sync_foundation.ensure_target_clean(self.target)
+
+    def test_rejects_untracked_files(self):
+        (self.target / 'notes.md').write_text('draft')
+        with self.assertRaises(RuntimeError):
+            sync_foundation.ensure_target_clean(self.target)
+
+    def test_regenerates_the_lockfile_in_the_target(self):
+        ok = subprocess.CompletedProcess([], 0, stdout='', stderr='')
+        with mock.patch.object(sync_foundation.subprocess, 'run', return_value=ok) as run:
+            sync_foundation.regenerate_lockfile(self.target)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0], ['gh', 'actions-lock', '--no-narrow'])
+        self.assertEqual(run.call_args.kwargs['cwd'], self.target)
+
+    def test_lockfile_failure_explains_how_to_install_the_tool(self):
+        failed = subprocess.CompletedProcess([], 1, stdout='', stderr='unknown command "actions-lock"')
+        with mock.patch.object(sync_foundation.subprocess, 'run', return_value=failed):
+            with self.assertRaises(RuntimeError) as raised:
+                sync_foundation.regenerate_lockfile(self.target)
+        self.assertIn('gh extension install github/gh-actions-lock', str(raised.exception))
+
+
 class EnsureDurableTests(unittest.TestCase):
     def run_compare(self, payload, returncode=0):
         result = subprocess.CompletedProcess([], returncode, stdout=json.dumps(payload), stderr='boom')
