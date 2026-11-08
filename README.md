@@ -17,7 +17,7 @@ Sign-in uses passkeys and email one-time codes. The VinoGuessr API and PostgreSQ
 
 Before developing, read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md), satisfy the Issue's dependencies, and change things through a branch and a PR. Run an independent Review Agent in parallel while implementing. PRs are reviewed by GitHub Codex; only when Codex cannot review because of its usage limit does a Claude Code review substitute ([review policy](policies/github-codex-review.md)).
 
-Shared files are not necessarily inherited. `AGENTS.md`, `CLAUDE.md`, CODEOWNERS, CI, and the license are placed explicitly in each repository and updated through follow-up PRs when the shared rules change. Reusable workflows are called by a reviewed commit SHA.
+Shared files are not necessarily inherited. `AGENTS.md`, `CLAUDE.md`, CODEOWNERS, CI, and the license are placed explicitly in each repository and updated through follow-up PRs when the shared rules change. Reusable workflows are called by a reviewed commit SHA. [bootstrap/sync_foundation.py](bootstrap/sync_foundation.py) copies the shared files into a repository checkout for those follow-up PRs, keeping the repository's own content.
 
 `vinoguessr-app`, which implements SwiftUI, carries the body of the [SwiftUI policy](policies/swiftui.md) and its source commit in its AGENTS.md. The policy document alone never counts as verifying UI behavior or performance.
 

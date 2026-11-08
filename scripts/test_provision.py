@@ -253,5 +253,29 @@ class ObservedChecksTests(unittest.TestCase):
         self.assertIn('Area field', str(raised.exception))
 
 
+class ViewsStageTests(unittest.TestCase):
+    def test_creates_only_missing_views(self):
+        existing = {'data': {'organization': {'projectV2': {'views': {'nodes': [
+            {'number': 1, 'name': 'View 1'}, {'number': 2, 'name': 'Backlog'}]}}}}}
+        created = []
+
+        def fake_api(path, method='GET', data=None):
+            created.append(data['name'])
+            return {'number': 10 + len(created)}
+
+        state = {'project': {'number': 1}}
+        with mock.patch.object(provision, 'gh', return_value=existing), \
+                mock.patch.object(provision, 'api', side_effect=fake_api), \
+                mock.patch.object(provision, 'save'):
+            provision.views(state, provision.REPOS)
+        self.assertNotIn('Backlog', created)
+        self.assertEqual(created, [name for name, _, _ in provision.VIEWS if name != 'Backlog'])
+        self.assertEqual(state['views']['Backlog'], 2)
+        self.assertEqual(set(state['views']), {name for name, _, _ in provision.VIEWS})
+
+    def test_view_layouts_are_supported_by_the_rest_api(self):
+        self.assertTrue(all(layout in {'table', 'board', 'roadmap'} for _, layout, _ in provision.VIEWS))
+
+
 if __name__ == '__main__':
     unittest.main()

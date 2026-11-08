@@ -4,6 +4,7 @@
 Reads gh's existing auth; never reads tokens. Run one stage at a time:
 
   --stage project   create/find the Organization Project, its fields, and repo links
+  --stage views     create the Project views (Backlog, Development board, Roadmap, ...)
   --stage items     add open Issues of every repo to the Project and set Area
   --stage settings  repository merge/security settings, empty Environments, labels
   --stage rulesets  protect main with PR + required CI checks (refuses until the checks have run)
@@ -36,9 +37,19 @@ FIELDS = [
     ('Phase', ['Foundation', 'MVP', 'Integration']),
     ('Area', [AREA_BY_REPO[r] for r in REPOS]),
 ]
+# Same views as the sauna-studio Project. GitHub's REST API creates views by name, layout and filter.
+VIEWS = [
+    ('Backlog', 'table', 'is:open'),
+    ('Development board', 'board', 'is:open'),
+    ('Roadmap', 'roadmap', 'is:open'),
+    ('By repository', 'table', 'is:open'),
+    ('Blocked', 'table', 'is:open is:blocked'),
+    ('Release readiness', 'table', 'is:open label:release'),
+]
 LABELS = [
     ('type:task', '1D76DB', 'Implementation or foundation task'),
     ('type:bug', 'D73A4A', 'Confirmed defect with regression verification'),
+    ('release', '0E8A16', 'Needed for the next release; listed in the Release readiness view'),
 ]
 RULESET_NAME = 'Main PR and verified CI'
 GITHUB_ACTIONS_APP_ID = 15368
@@ -155,6 +166,21 @@ def project(state, repos):
     print(p['url'], flush=True)
 
 
+def views(state, repos):
+    n = state['project']['number']
+    query = 'query($org:String!,$n:Int!){organization(login:$org){projectV2(number:$n){views(first:50){nodes{number name}}}}}'
+    result = gh('api', 'graphql', '-f', f'query={query}', '-f', f'org={ORG}', '-F', f'n={n}')
+    existing = {v['name']: v['number'] for v in result['data']['organization']['projectV2']['views']['nodes']}
+    state['views'] = {}
+    for name, layout, view_filter in VIEWS:
+        if name not in existing:
+            created = api(f'orgs/{ORG}/projectsV2/{n}/views', 'POST', {'name': name, 'layout': layout, 'filter': view_filter})
+            existing[name] = created['number']
+        state['views'][name] = existing[name]
+        save(state)
+        print('view', name, existing[name], flush=True)
+
+
 def area_option(area_field, repo):
     name = AREA_BY_REPO[repo]
     for option in area_field['options']:
@@ -267,7 +293,7 @@ def rulesets(state, repos):
         print('ruleset', repo, result['id'], flush=True)
 
 
-STAGES = {'project': project, 'items': items, 'settings': settings, 'rulesets': rulesets}
+STAGES = {'project': project, 'views': views, 'items': items, 'settings': settings, 'rulesets': rulesets}
 
 
 def main():

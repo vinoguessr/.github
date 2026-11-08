@@ -16,17 +16,37 @@ This report records the move to the same structure as [sauna-studio](https://git
 - `vinoguessr-web` replaces its old `ci.yml` with a `swift` job in `repository.yml` that calls `reusable-swift.yml`
 - ADRs live only in `vinoguessr-docs` and are not duplicated in `.github`
 - `CLAUDE.md` and `.claude/agents/` are placed in every repository for Claude Code reviews
+- Shared files reach existing repositories through [bootstrap/sync_foundation.py](../bootstrap/sync_foundation.py), which keeps existing content instead of requiring empty repositories
 - No admin app, admin web, or automation repositories
 
-## Done
+## Done (2026-11-08)
 
-- Created `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` as public repositories (2026-11-08)
-- Opened [vinoguessr/.github#1](https://github.com/vinoguessr/.github/pull/1) with the shared foundation
+- Created `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` as public repositories
+- Merged the shared foundation: [.github#1](https://github.com/vinoguessr/.github/pull/1) at `01fd9c61bce2139beb8ea173339d45c02d49b69f`, the SHA every repository calls reusable workflows at
+- Merged the distribution PRs, each with GitHub Codex review, an independent Claude Code review, and passing required CI:
+  - [vinoguessr-docs#1](https://github.com/vinoguessr/vinoguessr-docs/pull/1): foundation, ADR-0001 to ADR-0004, wiki source
+  - [vinoguessr-infrastructure#1](https://github.com/vinoguessr/vinoguessr-infrastructure/pull/1): foundation, Terraform moved from the api, runbook for a new project
+  - [vinoguessr-app#8](https://github.com/vinoguessr/vinoguessr-app/pull/8): foundation, SwiftUI policy, first CI
+  - [vinoguessr-web#1](https://github.com/vinoguessr/vinoguessr-web/pull/1): foundation, shared Swift CI
+  - [vinoguessr-api#406](https://github.com/vinoguessr/vinoguessr-api/pull/406): foundation, existing workflows pinned to commit SHAs
+- `bootstrap/provision.py` (results in [provisioning-results.json](provisioning-results.json)):
+  - `project`: [VinoGuessr Project](https://github.com/orgs/vinoguessr/projects/1) with Priority, Phase, and Area fields, linked to all six repositories
+  - `views`: Backlog, Development board, Roadmap, By repository, Blocked, Release readiness
+  - `items`: all open Issues added with Area set (33 existing Issues and 4 tracking Issues)
+  - `settings`: squash merge only (PR title and commit messages), branch deletion on merge, secret scanning and push protection, Dependabot alerts and security updates, private vulnerability reporting, empty development / staging / production Environments, `type:task` / `type:bug` / `release` labels
+  - `rulesets` (owner-approved): `Main PR and verified CI` on `main` of all six repositories (PR required, required checks up to date and passing, threads resolved, no force pushes or deletion, squash only, no bypass). The required checks had all run on main or a merged PR first. vinoguessr-api's older `main` ruleset was deleted, since the new ruleset already requires its `lint` / `test` / `docker-build`, and its `terraform` requirement would have blocked vinoguessr-api#407
+- Tracking Issues for follow-up work (Phase Foundation):
+  - [vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2) Bootstrap the Google Cloud project vinoguessr (P0)
+  - [vinoguessr-api#407](https://github.com/vinoguessr/vinoguessr-api/issues/407) Remove Terraform after the move to vinoguessr-infrastructure (P1)
+  - [vinoguessr-app#9](https://github.com/vinoguessr/vinoguessr-app/issues/9) Build and test VinoGuessrKit and the app in CI (P1)
+  - [.github#2](https://github.com/vinoguessr/.github/issues/2) Enforce workflow hardening in every repository (P1)
 
 ## Open items
 
-- PRs distributing the shared files to each repository
-- Apply the Project, settings, and rulesets with `bootstrap/provision.py`
-- Move Terraform to the infrastructure repository
-- Bootstrap the Google Cloud project `vinoguessr`
-- The shared repository policy check does not yet enforce workflow hardening (SHA pinning, `permissions`, `persist-credentials`) in downstream repositories. The existing api and web workflows reference actions by tag; pin them in the distribution PRs, then decide whether to enforce it in `reusable-repository.yml`
+- Open PRs created before the foundation (Dependabot and older feature PRs) never report the new required checks until they are updated with main; rebase them (for Dependabot, comment `@dependabot rebase`)
+- The "By repository" view has no grouping yet; the REST API creates views without grouping, so set "Group by: Repository" in the Project UI
+- Project workflows such as "Auto-add sub-issues to project" are set in the Project settings UI; they are not configured yet
+- The GitHub wiki of `vinoguessr-docs` has not been initialized or synced from `docs/wiki`
+- vinoguessr-api#405 and vinoguessr-app#7 (the BlindLog to VinoGuessr rename) are still open
+- The Google Cloud project `vinoguessr` is not built yet (vinoguessr-infrastructure#2). The api Deploy workflow has failed since the repository transfer, because the old project's Workload Identity Federation only trusts `zunda-pixel/blindlog-api`
+- The shared repository policy check does not yet enforce workflow hardening in downstream repositories (.github#2)
