@@ -1,0 +1,27 @@
+name: Reusable repository policy
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  policy:
+    name: Repository policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify explicit repository policy and secret file exclusions
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+          required = ['AGENTS.md', 'CLAUDE.md', 'README.md', '.github/CODEOWNERS', '.github/workflows/repository.yml', '.github/dependabot.yml']
+          missing = [p for p in required if not Path(p).is_file() or not Path(p).read_text().strip()]
+          assert not missing, f'Missing repository policy files: {missing}'
+          assert Path('CLAUDE.md').read_text().startswith('@AGENTS.md'), 'CLAUDE.md must import AGENTS.md on its first line'
+          files = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          forbidden = [p for p in files if Path(p).name in {'.env', 'terraform.tfstate', 'terraform.tfstate.backup'} or p.endswith(('.p12', '.p8', '.key'))]
+          assert not forbidden, f'Unexpected sensitive files: {forbidden}'
+          print('Repository policy files and sensitive-file exclusions verified.')
