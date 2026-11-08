@@ -94,6 +94,8 @@ def repository_settings():
     return {
         'has_issues': True, 'has_wiki': True, 'delete_branch_on_merge': True,
         'allow_squash_merge': True, 'allow_merge_commit': False, 'allow_rebase_merge': False,
+        # PR titles and commit messages are English; PR bodies are Japanese and stay out of history.
+        'squash_merge_commit_title': 'PR_TITLE', 'squash_merge_commit_message': 'COMMIT_MESSAGES',
         'security_and_analysis': {
             'secret_scanning': {'status': 'enabled'},
             'secret_scanning_push_protection': {'status': 'enabled'},
@@ -182,7 +184,9 @@ def project_item(number, url, cache):
 def items(state, repos):
     n = str(state['project']['number'])
     fields = gh('project', 'field-list', n, '--owner', ORG, '--format', 'json', '--limit', '100')['fields']
-    area = next(f for f in fields if f['name'] == 'Area')
+    area = next((f for f in fields if f['name'] == 'Area'), None)
+    if area is None:
+        raise RuntimeError('Project has no Area field; run --stage project first')
     existing = gh('project', 'item-list', n, '--owner', ORG, '--limit', '1000', '--format', 'json')['items']
     cache = {i['content']['url']: i for i in existing if i.get('content', {}).get('url')}
     state.setdefault('items', {})
@@ -226,11 +230,16 @@ def settings(state, repos):
         print('settings', repo, flush=True)
 
 
-def observed_checks(repo, recent_prs=10):
-    """Check-run names seen on main and on the heads of the most recently updated PRs."""
+def observed_checks(repo, recent_prs=30):
+    """Check-run names seen on main and on the heads of recently merged PRs.
+
+    PR heads are needed because some workflows (vinoguessr-api `ci.yml`) run only on
+    pull_request and never report on main. Open or abandoned PRs are excluded: a check
+    seen only there may never reach main, and a ruleset requiring it would lock main.
+    """
     shas = [api(f'repos/{ORG}/{repo}/commits/main')['sha']]
-    prs = api(f'repos/{ORG}/{repo}/pulls?state=all&sort=updated&direction=desc&per_page={recent_prs}')
-    shas += [pr['head']['sha'] for pr in prs]
+    prs = api(f'repos/{ORG}/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page={recent_prs}')
+    shas += [pr['head']['sha'] for pr in prs if pr.get('merged_at')]
     names = set()
     for sha in dict.fromkeys(shas):
         runs = api(f'repos/{ORG}/{repo}/commits/{sha}/check-runs?per_page=100')['check_runs']

@@ -4,11 +4,11 @@ The source of truth for these rules is `vinoguessr/.github/AGENTS.md`. Every rep
 
 ## Writing language
 
-Write code, documentation, commit messages, and labels in English. Write Issue bodies and PR bodies in Japanese. Issue Forms and the PR template stay in Japanese because they become the Issue and PR body.
+Write code, documentation, commit messages, labels, and PR titles in English. PRs are squash-merged with the PR title as the commit subject, so a PR title is a commit message. Write Issue bodies and PR bodies in Japanese. Issue Forms and the PR template stay in Japanese because they become the Issue and PR body.
 
 ## Purpose and architecture
 
-VinoGuessr is a service for blind wine tasting: people create events, set questions, answer them, get scored, and build a season rating. The VinoGuessr API and PostgreSQL are the source of truth for users, events, questions, answers, and scores. External services are never the source of truth.
+VinoGuessr is a service for blind wine tasting: people create events, set questions, answer them, get scored, and build a season rating. The VinoGuessr API and PostgreSQL are the source of truth for business data such as users, events, questions, answers, and scores. External services are never the source of truth.
 
 API: Swift 6 / Hummingbird / PostgreSQL / PostgresNIO / Valkey / Atlas / OpenAPI. Apple: SwiftUI, iOS, iPadOS, and macOS 27.0 or later. Web: Swift / Hummingbird. Infrastructure: Terraform / Google Cloud Run / Cloudflare (DNS, Images, Email) / Docker / OpenTelemetry. Target the latest stable OS and browser releases and do not add unnecessary backward-compatibility branches.
 
@@ -63,7 +63,7 @@ Use `codex/` branches and PRs; never push directly to `main`. Never overwrite ex
 
 A PR records the related Issue, what changes, the checks run and their results, independent Review and Security Review results, and known limitations. Never fake required checks by skipping them. Releases have a tested commit and a changelog; Environments separate the approval boundaries of development, staging, and production. Use Packages only when there is something to distribute.
 
-Record significant design changes as ADRs in `vinoguessr-docs` with context, decision, alternatives, and consequences, and update the wiki index. Update these rules and each repository's AGENTS.md when bugs recur or a review finding matters. When the shared rules change, open follow-up PRs in the other repositories and state the source commit.
+Record significant design changes as ADRs in `vinoguessr-docs` with context, decision, alternatives, and consequences, and update the wiki index. Update these rules and each repository's AGENTS.md as needed when bugs recur or a review finding matters. When the shared rules change, open follow-up PRs in the other repositories and state the source commit.
 
 ## Code review and merge conditions
 

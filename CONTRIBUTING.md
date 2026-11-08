@@ -8,7 +8,7 @@ Read [AGENTS.md](AGENTS.md) first. Check the Issue and its dependencies, and imp
 - Bug fixes include a reproduction and a regression test, and are re-reviewed after fixing findings.
 - PRs are reviewed by GitHub Codex. Only when Codex cannot review because of its usage limit, substitute a Claude Code review and record the evidence in the PR.
 - Record design decisions in ADRs, the index in the wiki, and recurring lessons in AGENTS.md.
-- Write code and documentation in English, and Issue and PR bodies in Japanese.
+- Write code, documentation, commit messages, labels, and PR titles in English, and Issue and PR bodies in Japanese.
 
 Updates to reusable workflows are not applied to every caller automatically. Pin calls to a commit SHA, and open follow-up PRs after verification.
 

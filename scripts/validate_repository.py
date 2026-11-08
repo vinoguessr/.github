@@ -36,11 +36,15 @@ def trigger_events(on: object) -> set[str]:
     return set()
 
 
-def job_permissions_are_safe(permissions: object) -> bool:
+def runs_codeql(job: dict) -> bool:
+    return any(str(step.get("uses", "")).startswith("github/codeql-action/") for step in job.get("steps") or [])
+
+
+def job_permissions_are_safe(permissions: object, codeql: bool) -> bool:
     if isinstance(permissions, str):
         return permissions == "read-all"
     if isinstance(permissions, dict):
-        return all(value in ("read", "none") or (value == "write" and scope in JOB_WRITE_ALLOWLIST)
+        return all(value in ("read", "none") or (value == "write" and codeql and scope in JOB_WRITE_ALLOWLIST)
                    for scope, value in permissions.items())
     return False
 
@@ -111,13 +115,13 @@ def validate(root: Path) -> list[str]:
                 if "uses" not in job:
                     require("timeout-minutes" in job, f"Missing job timeout: {p.name}")
                 if "permissions" in job:
-                    require(job_permissions_are_safe(job["permissions"]), f"Job permissions too broad: {p.name}: {job_id}")
+                    require(job_permissions_are_safe(job["permissions"], runs_codeql(job)), f"Job permissions too broad: {p.name}: {job_id}")
                 uses = [job["uses"]] if "uses" in job else []
                 for step in job.get("steps", []):
                     if "uses" in step:
                         uses.append(step["uses"])
                     if str(step.get("uses", "")).startswith("actions/checkout@"):
-                        require(step.get("with", {}).get("persist-credentials") == "false", f"Checkout credentials persist: {p.name}")
+                        require((step.get("with") or {}).get("persist-credentials") == "false", f"Checkout credentials persist: {p.name}")
                 for ref in uses:
                     require(ref.startswith("./") or bool(re.search(r"@[0-9a-f]{40}$", ref)), f"Action/workflow is not SHA pinned: {p.name}: {ref}")
         if p.parent.name == "ISSUE_TEMPLATE" and p.name != "config.yml":

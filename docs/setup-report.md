@@ -8,7 +8,7 @@ This report records the move to the same structure as [sauna-studio](https://git
 - Agents: Codex by default; a Claude Code review substitutes only when Codex cannot review because of its usage limit
 - Web: keep the Swift / Hummingbird stack
 - Google Cloud: bootstrap the new project `vinoguessr` through Issues and PRs after this foundation and the infrastructure repository are in place
-- Language: code and documentation in English; Issue and PR bodies in Japanese
+- Language: code, documentation, commit messages, labels, and PR titles in English; Issue and PR bodies in Japanese. Squash merges use the PR title as the commit subject and the commit messages as the body, so Japanese PR bodies never land in the history
 
 ## Differences from sauna-studio
 

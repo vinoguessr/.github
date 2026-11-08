@@ -65,10 +65,22 @@ class ValidateRepositoryTests(unittest.TestCase):
         self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    permissions:\n      contents: write' + SAFE_JOB)
         self.assertRejected('Job permissions too broad: x.yml: a')
 
-    def test_allows_security_events_write_for_code_scanning(self):
-        self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    permissions:\n'
-                   '      contents: read\n      security-events: write' + SAFE_JOB)
+    def test_allows_security_events_write_only_for_codeql_jobs(self):
+        codeql = ('on: push\npermissions:\n  contents: read\njobs:\n  a:\n    permissions:\n      contents: read\n'
+                  '      security-events: write\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n'
+                  '      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370\n')
+        self.write('.github/workflows/x.yml', codeql)
         self.assertEqual(self.errors(), [])
+
+    def test_rejects_security_events_write_outside_codeql(self):
+        self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    permissions:\n'
+                   '      security-events: write' + SAFE_JOB)
+        self.assertRejected('Job permissions too broad: x.yml: a')
+
+    def test_checkout_with_empty_with_is_reported_not_crashed(self):
+        self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n'
+                   '    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n        with:\n')
+        self.assertRejected('Checkout credentials persist: x.yml')
 
     def test_rejects_write_tools_given_as_yaml_list(self):
         self.write('.claude/agents/reviewer.md', '---\nname: reviewer\ndescription: d\ntools: [Read, Write, Edit]\n---\nbody\n')

@@ -65,6 +65,11 @@ class RepositorySettingsTests(unittest.TestCase):
         self.assertFalse(settings['allow_rebase_merge'])
         self.assertEqual(settings['security_and_analysis']['secret_scanning_push_protection'], {'status': 'enabled'})
 
+    def test_squash_commits_use_english_title_and_commit_messages(self):
+        settings = provision.repository_settings()
+        self.assertEqual(settings['squash_merge_commit_title'], 'PR_TITLE')
+        self.assertEqual(settings['squash_merge_commit_message'], 'COMMIT_MESSAGES')
+
 
 class ItemsStageTests(unittest.TestCase):
     def test_existing_area_is_not_overwritten_and_pull_requests_are_skipped(self):
@@ -211,6 +216,41 @@ class ProjectItemTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as raised:
             provision.area_option({'options': [{'name': 'api', 'id': 'O'}]}, 'vinoguessr-docs')
         self.assertIn("'docs'", str(raised.exception))
+
+
+class ObservedChecksTests(unittest.TestCase):
+    def test_counts_main_and_merged_prs_only_from_github_actions(self):
+        responses = {
+            'repos/vinoguessr/vinoguessr-api/commits/main': {'sha': 'MAIN'},
+            'repos/vinoguessr/vinoguessr-api/pulls?state=closed&sort=updated&direction=desc&per_page=30': [
+                {'head': {'sha': 'MERGED'}, 'merged_at': '2026-11-08T00:00:00Z'},
+                {'head': {'sha': 'MAIN'}, 'merged_at': '2026-11-07T00:00:00Z'},
+                {'head': {'sha': 'ABANDONED'}, 'merged_at': None},
+            ],
+            'repos/vinoguessr/vinoguessr-api/commits/MAIN/check-runs?per_page=100': {'check_runs': [
+                {'name': 'deploy', 'app': {'id': provision.GITHUB_ACTIONS_APP_ID}}]},
+            'repos/vinoguessr/vinoguessr-api/commits/MERGED/check-runs?per_page=100': {'check_runs': [
+                {'name': 'lint', 'app': {'id': provision.GITHUB_ACTIONS_APP_ID}},
+                {'name': 'CodeQL', 'app': {'id': 57789}}]},
+        }
+        requested = []
+
+        def fake_api(path, method='GET', data=None):
+            requested.append(path)
+            return responses[path]
+
+        with mock.patch.object(provision, 'api', side_effect=fake_api):
+            names = provision.observed_checks('vinoguessr-api')
+        self.assertEqual(names, {'deploy', 'lint'})
+        self.assertNotIn('repos/vinoguessr/vinoguessr-api/commits/ABANDONED/check-runs?per_page=100', requested)
+        self.assertEqual(requested.count('repos/vinoguessr/vinoguessr-api/commits/MAIN/check-runs?per_page=100'), 1)
+
+    def test_items_stage_requires_area_field(self):
+        state = {'project': {'id': 'P', 'number': 1}}
+        with mock.patch.object(provision, 'gh', return_value={'fields': []}):
+            with self.assertRaises(RuntimeError) as raised:
+                provision.items(state, ['vinoguessr-api'])
+        self.assertIn('Area field', str(raised.exception))
 
 
 if __name__ == '__main__':

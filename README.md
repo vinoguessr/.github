@@ -21,7 +21,7 @@ Shared files are not necessarily inherited. `AGENTS.md`, `CLAUDE.md`, CODEOWNERS
 
 `vinoguessr-app`, which implements SwiftUI, carries the body of the [SwiftUI policy](policies/swiftui.md) and its source commit in its AGENTS.md. The policy document alone never counts as verifying UI behavior or performance.
 
-Code and documentation are written in English; Issue and PR bodies are written in Japanese.
+Code, documentation, commit messages, labels, and PR titles are written in English; Issue and PR bodies are written in Japanese.
 
 This structure is based on [sauna-studio/.github](https://github.com/sauna-studio/.github).
 
