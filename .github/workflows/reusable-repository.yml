@@ -1,0 +1,45 @@
+name: Reusable repository policy
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  policy:
+    name: Repository policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify explicit repository policy and secret file exclusions
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          import subprocess
+          required = ['AGENTS.md', 'CLAUDE.md', 'README.md', '.github/CODEOWNERS', '.github/workflows/repository.yml',
+                      '.github/dependabot.yml', '.claude/agents/reviewer.md', '.claude/agents/security-reviewer.md']
+          missing = [p for p in required if not Path(p).is_file() or not Path(p).read_text().strip()]
+          assert not missing, f'Missing repository policy files: {missing}'
+          assert Path('CLAUDE.md').read_text().startswith('@AGENTS.md'), 'CLAUDE.md must import AGENTS.md on its first line'
+          files = [p for p in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0') if p]
+
+          def sensitive(path):
+              name = Path(path).name
+              if name == '.env' or (name.startswith('.env.') and name != '.env.example'):
+                  return True
+              if name in {'terraform.tfstate', 'terraform.tfstate.backup'} or name.endswith(('.p12', '.p8', '.key', '.pem')):
+                  return True
+              if name.endswith('.json') and Path(path).is_file():
+                  # Google service account keys are JSON; detect them by content, not by name.
+                  try:
+                      data = json.loads(Path(path).read_text())
+                  except (ValueError, UnicodeDecodeError):
+                      return False
+                  return isinstance(data, dict) and data.get('type') == 'service_account' and 'private_key' in data
+              return False
+
+          forbidden = [p for p in files if sensitive(p)]
+          assert not forbidden, f'Unexpected sensitive files: {forbidden}'
+          print('Repository policy files and sensitive-file exclusions verified.')
