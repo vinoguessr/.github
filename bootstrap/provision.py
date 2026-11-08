@@ -49,6 +49,7 @@ VIEWS = [
 LABELS = [
     ('type:task', '1D76DB', 'Implementation or foundation task'),
     ('type:bug', 'D73A4A', 'Confirmed defect with regression verification'),
+    ('release', '0E8A16', 'Needed for the next release; listed in the Release readiness view'),
 ]
 RULESET_NAME = 'Main PR and verified CI'
 GITHUB_ACTIONS_APP_ID = 15368

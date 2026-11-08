@@ -3,10 +3,19 @@
 
 Usage: sync_foundation.py --sha <40-char .github main SHA> --repo <name> --target <checkout> [--source <.github checkout>]
 
-Run it from a checkout of the .github commit given by --sha, then commit the result in the
-target repository through a PR. Files owned by .github are overwritten; repository-owned
-files (README, .gitignore, dependabot, existing workflows, LICENSE) are only appended to,
-replaced in their generated section, or created when missing.
+Run it from a clean checkout of the .github commit given by --sha, then commit the result in
+the target repository through a PR.
+
+- Copied verbatim (overwritten): CLAUDE.md, CONTRIBUTING.md, SECURITY.md, CODEOWNERS, the PR
+  template, Issue Forms, .codex/ and .claude/agents/, verify-lockfile.yml.
+- Regenerated in full: AGENTS.md (shared rules + "<repo> specifics") and repository.yml, so
+  hand edits to them are lost on re-sync.
+- Repository-owned: README.md (only the section between the foundation markers is replaced),
+  .gitignore (the baseline is appended), .github/dependabot.yml and LICENSE (created only when
+  missing), and every other workflow (untouched).
+
+Afterwards run `gh actions-lock --no-narrow` in the target to regenerate actions.lock. Files
+removed from .github are not deleted from targets; remove them by hand in the follow-up PR.
 """
 import argparse
 import json
@@ -57,6 +66,9 @@ GITIGNORE_BASELINE = ['.DS_Store', '__pycache__/', '.env', '.env.*', '!.env.exam
                       '*.xcuserstate', 'xcuserdata/', '.terraform/', '*.tfstate', '*.tfstate.*', '*.tfplan',
                       '*.tfvars', '!*.tfvars.example', '*.p12', '*.p8', '*.key', '*.pem']
 README_MARKER = '<!-- vinoguessr-foundation -->'
+README_END_MARKER = '<!-- /vinoguessr-foundation -->'
+# The last line of sections generated before README_END_MARKER existed.
+LEGACY_README_LAST_LINE = 'Follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md): satisfy the Issue'
 GITIGNORE_HEADING = '# VinoGuessr foundation baseline (vinoguessr/.github)'
 CHECKOUT = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1'
 
@@ -120,7 +132,46 @@ def readme_section(repo, sha):
     scope, architecture, verification = SCOPES[repo]
     return (f'\n{README_MARKER}\n## Scope\n\n{scope}\n\n## Architecture\n\n{architecture}\n\n## Verification\n\n{verification}\n\n'
             f'Follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md): satisfy the Issue\'s dependencies, then implement with an independent Review Agent running in parallel. '
-            f'Shared rules source: [{ORG}/.github@{sha[:12]}](https://github.com/{ORG}/.github/tree/{sha}).\n')
+            f'Shared rules source: [{ORG}/.github@{sha[:12]}](https://github.com/{ORG}/.github/tree/{sha}).\n'
+            f'{README_END_MARKER}\n')
+
+
+def generated_section_end(text, start):
+    """End offset of the generated README section that begins at `start`."""
+    end = text.find(README_END_MARKER, start)
+    if end != -1:
+        newline = text.find('\n', end)
+        return len(text) if newline == -1 else newline + 1
+    # Sections written before the end marker existed end with one exact generated line.
+    for line_start in [m.start() for m in re.finditer(r'^', text[start:], re.M)]:
+        line_start += start
+        if text.startswith(LEGACY_README_LAST_LINE, line_start):
+            newline = text.find('\n', line_start)
+            return len(text) if newline == -1 else newline + 1
+    raise RuntimeError(f'README.md has {README_MARKER} but no {README_END_MARKER}; restore the end marker by hand')
+
+
+def gitignore_additions(lines):
+    """Baseline lines to append. Later rules win in gitignore, so every baseline exception after a
+    newly appended rule is appended again, even if the repository already has it."""
+    additions, appended_rule = [], False
+    for line in GITIGNORE_BASELINE:
+        if line not in lines:
+            additions.append(line)
+            appended_rule = appended_rule or not line.startswith('!')
+        elif line.startswith('!') and appended_rule:
+            additions.append(line)
+    return additions
+
+
+def ensure_source_matches(source, sha):
+    """The copied files must be exactly the commit named in the generated `Shared rules source` lines."""
+    head = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'], capture_output=True, text=True)
+    if head.returncode or head.stdout.strip() != sha:
+        raise RuntimeError(f'{source} is not checked out at {sha}')
+    status = subprocess.run(['git', '-C', str(source), 'status', '--porcelain'], capture_output=True, text=True)
+    if status.returncode or status.stdout.strip():
+        raise RuntimeError(f'{source} has uncommitted changes; sync from a clean checkout')
 
 
 def ensure_durable(sha):
@@ -152,15 +203,14 @@ def sync(source, sha, repo, target):
     readme = target / 'README.md'
     original = readme.read_text() if readme.exists() else f'# {repo}\n'
     if README_MARKER in original:
-        # Replace the previously generated section, which ends with its "Shared rules source" line.
         start = original.index(README_MARKER)
-        end = original.index('\n', original.index('Shared rules source:', start)) + 1
+        end = generated_section_end(original, start)
         readme.write_text(original[:start].rstrip() + '\n' + readme_section(repo, sha) + original[end:])
     else:
         readme.write_text(original.rstrip() + '\n' + readme_section(repo, sha))
     gitignore = target / '.gitignore'
     lines = gitignore.read_text().splitlines() if gitignore.exists() else []
-    missing = [line for line in GITIGNORE_BASELINE if line not in lines]
+    missing = gitignore_additions(lines)
     if missing:
         heading = [GITIGNORE_HEADING] if GITIGNORE_HEADING not in lines else []
         separator = [''] if lines and (lines[-1].strip() or heading) else []
@@ -188,6 +238,7 @@ def main():
     p.add_argument('--target', type=Path, required=True)
     a = p.parse_args()
     ensure_durable(a.sha)
+    ensure_source_matches(a.source.resolve(), a.sha)
     sync(a.source.resolve(), a.sha, a.repo, a.target.resolve())
 
 

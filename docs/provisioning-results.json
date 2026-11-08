@@ -185,5 +185,55 @@
     "By repository": 5,
     "Blocked": 6,
     "Release readiness": 7
+  },
+  "rulesets": {
+    ".github": {
+      "id": 26786622,
+      "required_checks": [
+        "Foundation validation",
+        "Analyze Python tooling",
+        "Verify action dependency provenance"
+      ]
+    },
+    "vinoguessr-api": {
+      "id": 26786624,
+      "required_checks": [
+        "policy / Repository policy",
+        "Verify action dependency provenance",
+        "lint",
+        "test",
+        "docker-build"
+      ]
+    },
+    "vinoguessr-app": {
+      "id": 26786625,
+      "required_checks": [
+        "policy / Repository policy",
+        "Verify action dependency provenance"
+      ]
+    },
+    "vinoguessr-web": {
+      "id": 26786626,
+      "required_checks": [
+        "policy / Repository policy",
+        "Verify action dependency provenance",
+        "swift / Swift build and test"
+      ]
+    },
+    "vinoguessr-infrastructure": {
+      "id": 26786627,
+      "required_checks": [
+        "policy / Repository policy",
+        "Verify action dependency provenance",
+        "terraform / Terraform format and validate"
+      ]
+    },
+    "vinoguessr-docs": {
+      "id": 26786628,
+      "required_checks": [
+        "policy / Repository policy",
+        "Verify action dependency provenance"
+      ]
+    }
   }
 }

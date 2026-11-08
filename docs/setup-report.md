@@ -33,7 +33,8 @@ This report records the move to the same structure as [sauna-studio](https://git
   - `project`: [VinoGuessr Project](https://github.com/orgs/vinoguessr/projects/1) with Priority, Phase, and Area fields, linked to all six repositories
   - `views`: Backlog, Development board, Roadmap, By repository, Blocked, Release readiness
   - `items`: all open Issues added with Area set (33 existing Issues and 4 tracking Issues)
-  - `settings`: squash merge only (PR title and commit messages), branch deletion on merge, secret scanning and push protection, Dependabot alerts and security updates, private vulnerability reporting, empty development / staging / production Environments, `type:task` / `type:bug` labels
+  - `settings`: squash merge only (PR title and commit messages), branch deletion on merge, secret scanning and push protection, Dependabot alerts and security updates, private vulnerability reporting, empty development / staging / production Environments, `type:task` / `type:bug` / `release` labels
+  - `rulesets` (owner-approved): `Main PR and verified CI` on `main` of all six repositories (PR required, required checks up to date and passing, threads resolved, no force pushes or deletion, squash only, no bypass). The required checks had all run on main or a merged PR first. vinoguessr-api's older `main` ruleset was deleted, since the new ruleset already requires its `lint` / `test` / `docker-build`, and its `terraform` requirement would have blocked vinoguessr-api#407
 - Tracking Issues for follow-up work (Phase Foundation):
   - [vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2) Bootstrap the Google Cloud project vinoguessr (P0)
   - [vinoguessr-api#407](https://github.com/vinoguessr/vinoguessr-api/issues/407) Remove Terraform after the move to vinoguessr-infrastructure (P1)
@@ -42,7 +43,8 @@ This report records the move to the same structure as [sauna-studio](https://git
 
 ## Open items
 
-- `--stage rulesets` has not been run; it needs the owner's approval. `vinoguessr-api` already has a ruleset named `main` (PR, squash only, required `test` / `lint` / `docker-build` / `terraform`); applying the new ruleset should replace it rather than stack on top of it, and `terraform` must leave the required checks before vinoguessr-api#407 removes that job
+- Open PRs created before the foundation (Dependabot and older feature PRs) never report the new required checks until they are updated with main; rebase them (for Dependabot, comment `@dependabot rebase`)
+- The "By repository" view has no grouping yet; the REST API creates views without grouping, so set "Group by: Repository" in the Project UI
 - Project workflows such as "Auto-add sub-issues to project" are set in the Project settings UI; they are not configured yet
 - The GitHub wiki of `vinoguessr-docs` has not been initialized or synced from `docs/wiki`
 - vinoguessr-api#405 and vinoguessr-app#7 (the BlindLog to VinoGuessr rename) are still open

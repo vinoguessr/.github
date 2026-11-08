@@ -98,9 +98,68 @@ class SyncFoundationTests(unittest.TestCase):
         self.assertEqual(lines.count('.env'), 1)
         self.assertIn('__pycache__/', lines)
 
+    def test_gitignore_keeps_existing_exceptions_effective(self):
+        (self.target / '.gitignore').write_text('.env*\n!.env.example\n')
+        (self.target / '.env.example').write_text('X=')
+        self.sync()
+        ignored = subprocess.run(['git', 'check-ignore', '--no-index', '-q', '.env.example'], cwd=self.target)
+        self.assertEqual(ignored.returncode, 1, (self.target / '.gitignore').read_text())
+
+    def test_readme_resync_keeps_user_text_when_the_generated_last_line_was_edited(self):
+        (self.target / 'README.md').write_text('# repo\n')
+        self.sync()
+        readme = (self.target / 'README.md').read_text()
+        lines = [line for line in readme.splitlines() if not line.startswith('Follow [AGENTS.md]')]
+        (self.target / 'README.md').write_text('\n'.join(lines) + '\n\n## Team notes\n\nShared rules source: see AGENTS.md.\n')
+        self.sync(sha=OTHER_SHA)
+        readme = (self.target / 'README.md').read_text()
+        self.assertTrue(readme.endswith('## Team notes\n\nShared rules source: see AGENTS.md.\n'))
+        self.assertEqual(readme.count(sync_foundation.README_END_MARKER), 1)
+
+    def test_readme_from_before_the_end_marker_is_migrated(self):
+        legacy = sync_foundation.readme_section('vinoguessr-web', SHA).replace(sync_foundation.README_END_MARKER + '\n', '')
+        (self.target / 'README.md').write_text('# repo\n' + legacy + '\nDesign documents: kept.\n')
+        self.sync(sha=OTHER_SHA)
+        readme = (self.target / 'README.md').read_text()
+        self.assertTrue(readme.endswith(sync_foundation.README_END_MARKER + '\n\nDesign documents: kept.\n'))
+        self.assertNotIn(SHA[:12], readme)
+
+    def test_readme_without_a_recognizable_end_fails_clearly(self):
+        (self.target / 'README.md').write_text('# repo\n\n' + sync_foundation.README_MARKER + '\n## Scope\n\nEdited by hand.\n')
+        with self.assertRaises(RuntimeError) as raised:
+            self.sync()
+        self.assertIn(sync_foundation.README_END_MARKER, str(raised.exception))
+
     def test_rejects_a_non_sha(self):
         with self.assertRaises(ValueError):
             sync_foundation.sync(ROOT, 'main', 'vinoguessr-web', self.target)
+
+
+class EnsureSourceMatchesTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.source = Path(self.tmp.name)
+        git = ['git', '-C', str(self.source), '-c', 'user.name=t', '-c', 'user.email=t@example.com']
+        subprocess.run(['git', 'init', '-q', str(self.source)], check=True)
+        (self.source / 'AGENTS.md').write_text('rules')
+        subprocess.run(git + ['add', '-A'], check=True)
+        subprocess.run(git + ['commit', '-q', '-m', 'init'], check=True)
+        self.head = subprocess.run(['git', '-C', str(self.source), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_accepts_a_clean_checkout_at_the_sha(self):
+        sync_foundation.ensure_source_matches(self.source, self.head)
+
+    def test_rejects_a_checkout_at_another_commit(self):
+        with self.assertRaises(RuntimeError):
+            sync_foundation.ensure_source_matches(self.source, OTHER_SHA)
+
+    def test_rejects_uncommitted_changes(self):
+        (self.source / 'AGENTS.md').write_text('edited')
+        with self.assertRaises(RuntimeError):
+            sync_foundation.ensure_source_matches(self.source, self.head)
 
 
 class EnsureDurableTests(unittest.TestCase):
