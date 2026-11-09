@@ -36,17 +36,27 @@ This report records the move to the same structure as [sauna-studio](https://git
   - `settings`: squash merge only (PR title and commit messages), branch deletion on merge, secret scanning and push protection, Dependabot alerts and security updates, private vulnerability reporting, empty development / staging / production Environments, `type:task` / `type:bug` / `release` labels
   - `rulesets` (owner-approved): `Main PR and verified CI` on `main` of all six repositories (PR required, required checks up to date and passing, threads resolved, no force pushes or deletion, squash only, no bypass). The required checks had all run on main or a merged PR first. vinoguessr-api's older `main` ruleset was deleted, since the new ruleset already requires its `lint` / `test` / `docker-build`, and its `terraform` requirement would have blocked vinoguessr-api#407
 - Tracking Issues for follow-up work (Phase Foundation):
-  - [vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2) Bootstrap the Google Cloud project vinoguessr (P0)
-  - [vinoguessr-api#407](https://github.com/vinoguessr/vinoguessr-api/issues/407) Remove Terraform after the move to vinoguessr-infrastructure (P1)
+  - [vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2) Bootstrap the Google Cloud project vinoguessr (P0, closed 2026-11-09)
+  - [vinoguessr-api#407](https://github.com/vinoguessr/vinoguessr-api/issues/407) Remove Terraform after the move to vinoguessr-infrastructure (P1, closed 2026-11-08)
   - [vinoguessr-app#9](https://github.com/vinoguessr/vinoguessr-app/issues/9) Build and test VinoGuessrKit and the app in CI (P1)
   - [.github#2](https://github.com/vinoguessr/.github/issues/2) Enforce workflow hardening in every repository (P1)
+- The rename PRs [vinoguessr-api#405](https://github.com/vinoguessr/vinoguessr-api/pull/405) and [vinoguessr-app#7](https://github.com/vinoguessr/vinoguessr-app/pull/7) are merged
+
+## Done (2026-11-09)
+
+- All six built-in Project workflows are enabled: Auto-add sub-issues to project, Auto-close issue, Item added to project, Item closed, Pull request linked to issue, Pull request merged
+- Built the Google Cloud project `vinoguessr` with the vinoguessr-infrastructure runbook ([vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2)):
+  - `api.vinoguessr.com` and the passkey association file on `vinoguessr.com` are served through Cloudflare, the external HTTPS load balancer, and Cloud Run; direct `*.run.app` access is rejected
+  - The vinoguessr-api Deploy workflow succeeded end to end against the new project
+  - Mail from `support@vinoguessr.com` passes SPF, DKIM, and DMARC through Cloudflare Email Service
+- Retired BlindLog: requested deletion of the old Google Cloud project `blindlog` (restorable until about 2026-12-09), deleted the old Neon database and the `blindlog.me` Cloudflare zone, and turned off auto-renewal of `blindlog.me` (it lapses on 2027-08-04)
 
 ## Open items
 
 - Open PRs created before the foundation (Dependabot and older feature PRs) never report the new required checks until they are updated with main; rebase them (for Dependabot, comment `@dependabot rebase`)
 - The "By repository" view has no grouping yet; the REST API creates views without grouping, so set "Group by: Repository" in the Project UI
-- Project workflows such as "Auto-add sub-issues to project" are set in the Project settings UI; they are not configured yet
+- The Project still has the default "View 1" next to the provisioned views
 - The GitHub wiki of `vinoguessr-docs` has not been initialized or synced from `docs/wiki`
-- vinoguessr-api#405 and vinoguessr-app#7 (the BlindLog to VinoGuessr rename) are still open
-- The Google Cloud project `vinoguessr` is not built yet (vinoguessr-infrastructure#2). The api Deploy workflow has failed since the repository transfer, because the old project's Workload Identity Federation only trusts `zunda-pixel/blindlog-api`
+- No website is served: `blindlog-web` went away with the old project, and `vinoguessr.com` serves only the passkey association file until vinoguessr-web is deployed there ([vinoguessr-infrastructure#8](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/8))
+- Cloud Run reads the app secrets at `latest`, so a rotated secret takes effect only on the next revision ([vinoguessr-infrastructure#6](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/6))
 - The shared repository policy check does not yet enforce workflow hardening in downstream repositories (.github#2)
