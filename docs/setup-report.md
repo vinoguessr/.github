@@ -44,19 +44,20 @@ This report records the move to the same structure as [sauna-studio](https://git
 
 ## Done (2026-11-09)
 
-- All six built-in Project workflows are enabled: Auto-add sub-issues to project, Auto-close issue, Item added to project, Item closed, Pull request linked to issue, Pull request merged
+- The six workflows the Project API reports are enabled: Auto-add sub-issues to project, Auto-close issue, Item added to project, Item closed, Pull request linked to issue, Pull request merged
 - Built the Google Cloud project `vinoguessr` with the vinoguessr-infrastructure runbook ([vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2)):
   - `api.vinoguessr.com` and the passkey association file on `vinoguessr.com` are served through Cloudflare, the external HTTPS load balancer, and Cloud Run; direct `*.run.app` access is rejected
   - The vinoguessr-api Deploy workflow succeeded end to end against the new project
   - Mail from `support@vinoguessr.com` passes SPF, DKIM, and DMARC through Cloudflare Email Service
-- Retired BlindLog: requested deletion of the old Google Cloud project `blindlog` (restorable until about 2026-12-09), deleted the old Neon database and the `blindlog.me` Cloudflare zone, and turned off auto-renewal of `blindlog.me` (it lapses on 2027-08-04)
+- Retired BlindLog: requested deletion of the old Google Cloud project `blindlog` (restorable until about 2026-12-09), deleted the old Neon database, removed every `blindlog.me` service and mail record including `api.blindlog.me` (only SPF `v=spf1 -all` and DMARC `p=reject` remain against spoofing), and turned off auto-renewal of `blindlog.me` (it lapses on 2027-08-04)
 
 ## Open items
 
 - Open PRs created before the foundation (Dependabot and older feature PRs) never report the new required checks until they are updated with main; rebase them (for Dependabot, comment `@dependabot rebase`)
 - The "By repository" view has no grouping yet; the REST API creates views without grouping, so set "Group by: Repository" in the Project UI
 - The Project still has the default "View 1" next to the provisioned views
+- The Project workflows "Auto-add to project" and "Auto-archive items" are not configured, and the Issue Forms do not set `projects`, so new Issues and PRs join the Project only when added by hand
 - The GitHub wiki of `vinoguessr-docs` has not been initialized or synced from `docs/wiki`
 - No website is served: `blindlog-web` went away with the old project, and `vinoguessr.com` serves only the passkey association file until vinoguessr-web is deployed there ([vinoguessr-infrastructure#8](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/8))
-- Cloud Run reads the app secrets at `latest`, so a rotated secret takes effect only on the next revision ([vinoguessr-infrastructure#6](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/6))
+- Cloud Run resolves the app secrets at `latest` when each instance starts, so a new secret version mixes old and new values within one revision, and rolling back a revision does not restore the old value ([vinoguessr-infrastructure#6](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/6))
 - The shared repository policy check does not yet enforce workflow hardening in downstream repositories (.github#2)
