@@ -12,18 +12,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Verify explicit repository policy and secret file exclusions
+      - name: Verify repository policy files, workflow hardening, and secret file exclusions
         shell: python
         run: |
           from pathlib import Path
           import json
+          import re
           import subprocess
+          import sys
+
+          # PyYAML comes with the runner's system Python as a cloud-init dependency rather than from
+          # the image's documented software list, so .github runs this step on itself (repository.yml)
+          # to catch an image that drops it. Installing it would add a download to every repository's check.
+          import yaml
+
+          errors = []
+
           required = ['AGENTS.md', 'CLAUDE.md', 'README.md', '.github/CODEOWNERS', '.github/workflows/repository.yml',
                       '.github/dependabot.yml', '.claude/agents/reviewer.md', '.claude/agents/security-reviewer.md']
           missing = [p for p in required if not Path(p).is_file() or not Path(p).read_text().strip()]
-          assert not missing, f'Missing repository policy files: {missing}'
-          assert Path('CLAUDE.md').read_text().startswith('@AGENTS.md'), 'CLAUDE.md must import AGENTS.md on its first line'
-          files = [p for p in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0') if p]
+          if missing:
+              errors.append(f'Missing repository policy files: {missing}')
+          if Path('CLAUDE.md').is_file() and not Path('CLAUDE.md').read_text().startswith('@AGENTS.md'):
+              errors.append('CLAUDE.md must import AGENTS.md on its first line')
 
           def sensitive(path):
               name = Path(path).name
@@ -40,6 +51,66 @@ jobs:
                   return isinstance(data, dict) and data.get('type') == 'service_account' and 'private_key' in data
               return False
 
+          files = [p for p in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0') if p]
           forbidden = [p for p in files if sensitive(p)]
-          assert not forbidden, f'Unexpected sensitive files: {forbidden}'
-          print('Repository policy files and sensitive-file exclusions verified.')
+          if forbidden:
+              errors.append(f'Unexpected sensitive files: {forbidden}')
+
+          class WorkflowLoader(yaml.SafeLoader):
+              """Read `on:` and `false` as the strings GitHub's YAML 1.2 parser sees, not YAML 1.1 booleans."""
+
+          WorkflowLoader.yaml_implicit_resolvers = {
+              key: [(tag, pattern) for tag, pattern in values if tag != 'tag:yaml.org,2002:bool']
+              for key, values in yaml.SafeLoader.yaml_implicit_resolvers.items()
+          }
+          PINNED = re.compile(r'[^@\s]+@[0-9a-f]{40}')
+
+          def triggers(on):
+              if isinstance(on, str):
+                  return {on}
+              return {str(event) for event in on} if isinstance(on, (list, dict)) else set()
+
+          def workflow_errors(path):
+              try:
+                  workflow = yaml.load(path.read_text(), Loader=WorkflowLoader)
+              except (yaml.YAMLError, UnicodeDecodeError) as exc:
+                  return [f'{path}: invalid YAML: {" ".join(str(exc).split())}']
+              if not isinstance(workflow, dict) or not isinstance(workflow.get('jobs'), dict):
+                  return [f'{path}: expected a workflow mapping with jobs']
+              found = []
+              if 'pull_request_target' in triggers(workflow.get('on')):
+                  found.append(f'{path}: pull_request_target runs with a write token and secrets; use pull_request')
+              permissions = workflow.get('permissions')
+              # Write scopes belong on the job that needs them, so every other job stays read-only.
+              if not isinstance(permissions, dict) or any(value not in ('read', 'none') for value in permissions.values()):
+                  found.append(f'{path}: top-level permissions must list read-only scopes; grant write scopes on the job that needs them')
+              for job_id, job in workflow['jobs'].items():
+                  if not isinstance(job, dict):
+                      found.append(f'{path}: job {job_id}: expected a mapping')
+                      continue
+                  if 'permissions' in job and not isinstance(job['permissions'], dict):
+                      found.append(f'{path}: job {job_id}: permissions must list scopes, not {job["permissions"]!r}')
+                  steps = job.get('steps') or []
+                  steps = [step for step in steps if isinstance(step, dict)] if isinstance(steps, list) else []
+                  uses = [job['uses']] if 'uses' in job else []
+                  uses += [step['uses'] for step in steps if 'uses' in step]
+                  for ref in map(str, uses):
+                      if not (ref.startswith('./') or PINNED.fullmatch(ref)):
+                          found.append(f'{path}: job {job_id}: {ref} is not pinned to a full commit SHA')
+                  for step in steps:
+                      # Action names are case-insensitive on GitHub.
+                      if str(step.get('uses', '')).lower().startswith('actions/checkout@'):
+                          inputs = step.get('with')
+                          persist = inputs.get('persist-credentials') if isinstance(inputs, dict) else None
+                          if str(persist).lower() != 'false':
+                              found.append(f'{path}: job {job_id}: actions/checkout must set persist-credentials: false')
+              return found
+
+          workflows = Path('.github/workflows')
+          for path in sorted([*workflows.glob('*.yml'), *workflows.glob('*.yaml')]):
+              errors.extend(workflow_errors(path))
+
+          if errors:
+              print('\n'.join(errors), file=sys.stderr)
+              sys.exit(1)
+          print('Repository policy files, workflow hardening, and sensitive-file exclusions verified.')

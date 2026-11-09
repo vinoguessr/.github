@@ -41,20 +41,11 @@ class ValidateRepositoryTests(unittest.TestCase):
     def test_repository_itself_is_valid(self):
         self.assertEqual(self.errors(), [])
 
-    def test_rejects_pull_request_target_as_list(self):
-        self.write('.github/workflows/x.yml', 'on: [pull_request_target]\npermissions:\n  contents: read\njobs:\n  a:' + SAFE_JOB)
-        self.assertRejected('Unsafe trigger: x.yml')
-
-    def test_rejects_pull_request_target_as_string(self):
-        self.write('.github/workflows/x.yml', 'on: pull_request_target\npermissions:\n  contents: read\njobs:\n  a:' + SAFE_JOB)
-        self.assertRejected('Unsafe trigger: x.yml')
-
     def test_checks_yaml_extension_workflows(self):
         self.write('.github/workflows/x.yaml', 'on: push\npermissions: write-all\njobs:\n  a:\n    runs-on: ubuntu-latest\n'
                    '    steps:\n      - uses: actions/checkout@v4\n')
         errors = self.errors()
         self.assertTrue(any('contents:read: x.yaml' in e for e in errors), errors)
-        self.assertTrue(any('not SHA pinned: x.yaml' in e for e in errors), errors)
         self.assertTrue(any('Missing job timeout: x.yaml' in e for e in errors), errors)
 
     def test_rejects_job_level_write_all(self):
@@ -76,11 +67,6 @@ class ValidateRepositoryTests(unittest.TestCase):
         self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    permissions:\n'
                    '      security-events: write' + SAFE_JOB)
         self.assertRejected('Job permissions too broad: x.yml: a')
-
-    def test_checkout_with_empty_with_is_reported_not_crashed(self):
-        self.write('.github/workflows/x.yml', 'on: push\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n'
-                   '    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n        with:\n')
-        self.assertRejected('Checkout credentials persist: x.yml')
 
     def test_rejects_write_tools_given_as_yaml_list(self):
         self.write('.claude/agents/reviewer.md', '---\nname: reviewer\ndescription: d\ntools: [Read, Write, Edit]\n---\nbody\n')
