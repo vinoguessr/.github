@@ -62,18 +62,34 @@ jobs:
               key: [(tag, pattern) for tag, pattern in values if tag != 'tag:yaml.org,2002:bool']
               for key, values in yaml.SafeLoader.yaml_implicit_resolvers.items()
           }
-          PINNED = re.compile(r'[^@\s]+@[0-9a-f]{40}')
+          FULL_SHA = re.compile(r'[0-9a-f]{40}')
+          SEGMENT = re.compile(r'[A-Za-z0-9._-]+')
 
           def triggers(on):
               if isinstance(on, str):
                   return {on}
               return {str(event) for event in on} if isinstance(on, (list, dict)) else set()
 
+          def reference_error(ref):
+              """Why `uses: ref` is rejected, or None for a local action or a canonical owner/repo[/path]@<full SHA>."""
+              if ref.startswith('./'):
+                  return None
+              name, at, version = ref.rpartition('@')
+              if not at or not FULL_SHA.fullmatch(version):
+                  return 'is not pinned to a full commit SHA'
+              # Only canonical spellings pass, instead of mirroring every normalization: the runner splits on '/'
+              # and '\' and drops empty segments, and Git resolves `actions/check%6Fut` and `actions/checkout.git`
+              # to actions/checkout, so an alias would otherwise slip past the actions/checkout rule below.
+              segments = name.split('/')
+              if (len(segments) < 2 or segments[1].lower().endswith('.git')
+                      or any(not SEGMENT.fullmatch(segment) or segment in {'.', '..'} for segment in segments)):
+                  return ('is not a canonical owner/repo[/path] reference: use single "/" separators, only ASCII '
+                          'letters, digits, ".", "_", and "-", and no ".git" suffix')
+              return None
+
           def action_name(ref):
-              # The runner splits the path on '/' and '\' and drops empty segments before taking owner/repo,
-              # so `actions//checkout@sha` and `actions\checkout/.@sha` still run actions/checkout.
-              segments = [segment for segment in re.split(r'[/\\]', ref.rpartition('@')[0]) if segment]
-              return '/'.join(segments[:2]).lower()
+              """Lowercased owner/repo of a reference that passed reference_error; GitHub ignores case there."""
+              return '/'.join(ref.rpartition('@')[0].split('/')[:2]).lower()
 
           def workflow_errors(path):
               try:
@@ -104,8 +120,8 @@ jobs:
                   uses = [job['uses']] if 'uses' in job else []
                   uses += [step['uses'] for step in steps if 'uses' in step]
                   for ref in map(str, uses):
-                      if not (ref.startswith('./') or PINNED.fullmatch(ref)):
-                          found.append(f'{path}: job {job_id}: {ref} is not pinned to a full commit SHA')
+                      if reason := reference_error(ref):
+                          found.append(f'{path}: job {job_id}: {ref} {reason}')
                   for step in steps:
                       if action_name(str(step.get('uses', ''))) == 'actions/checkout':
                           inputs = step.get('with') if isinstance(step.get('with'), dict) else {}
@@ -119,7 +135,12 @@ jobs:
           for path in sorted([*workflows.glob('*.yml'), *workflows.glob('*.yaml')]):
               errors.extend(workflow_errors(path))
 
+          def printable(text):
+              """Escape everything but printable ASCII: a look-alike character stays visible, and a newline in a
+              file name, job ID, or `uses:` cannot start a log line the runner reads as a workflow command."""
+              return ''.join(c if ' ' <= c <= '~' else c.encode('unicode_escape').decode() for c in text)
+
           if errors:
-              print('\n'.join(errors), file=sys.stderr)
+              print('\n'.join(map(printable, errors)), file=sys.stderr)
               sys.exit(1)
           print('Repository policy files, workflow hardening, and sensitive-file exclusions verified.')

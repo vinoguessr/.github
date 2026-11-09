@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import tempfile
@@ -144,13 +145,52 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
                 self.assertRejected({'.github/workflows/ci.yml': workflow(steps=checkout)},
                                     'job build: actions/checkout must set persist-credentials: false')
 
-    def test_recognizes_checkout_however_the_runner_spells_it(self):
-        for spelling in ['Actions/Checkout@', 'actions/checkout/@', 'actions//checkout@', 'actions\\checkout@',
-                         'actions/checkout/.@']:
+    def test_recognizes_checkout_in_any_letter_case(self):
+        for spelling in ['Actions/Checkout@', 'ACTIONS/CHECKOUT@']:
             with self.subTest(spelling=spelling):
                 steps = f'      - uses: {CHECKOUT.replace("actions/checkout@", spelling)}\n'
                 self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)},
                                     'job build: actions/checkout must set persist-credentials: false')
+
+    def test_rejects_non_canonical_action_references(self):
+        # Each spelling is pinned and sets persist-credentials: false, so only its spelling is wrong.
+        # U+0441 is CYRILLIC SMALL LETTER ES and U+FF43 is FULLWIDTH LATIN SMALL LETTER C; both look like "c".
+        for spelling in ['actions/check%6Fut', 'actions/checkout.git', 'actions/checkout.GIT', 'actions//checkout',
+                         'actions\\checkout', 'actions\\checkout/x', '/actions/checkout', 'actions/checkout/',
+                         'actions/checkout/.', 'actions/checkout/../checkout', 'actions/checkout/ x',
+                         'actions/\u0441heckout', 'actions/\uff43heckout', 'checkout']:
+            with self.subTest(spelling=spelling):
+                ref = CHECKOUT.replace('actions/checkout', spelling)
+                # A JSON string is a YAML double-quoted scalar, so every spelling survives the YAML parser intact.
+                steps = f'      - uses: {json.dumps(ref)}\n        with:\n          persist-credentials: false\n'
+                shown = ref.encode('ascii', 'backslashreplace').decode()  # The log escapes non-ASCII characters.
+                self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)},
+                                    f'job build: {shown} is not a canonical owner/repo[/path] reference')
+
+    def test_escapes_control_characters_so_a_reference_cannot_start_a_log_line(self):
+        ref = CHECKOUT + '\n::warning::injected'
+        steps = f'      - uses: {json.dumps(ref)}\n        with:\n          persist-credentials: false\n'
+        ok, output = self.run_policy({'.github/workflows/ci.yml': workflow(steps=steps)})
+        self.assertFalse(ok, output)
+        self.assertIn(f'{CHECKOUT}\\n::warning::injected is not pinned to a full commit SHA', output)
+        self.assertFalse(any(line.startswith('::') for line in output.splitlines()), output)
+
+    def test_rejects_non_canonical_reusable_workflow_calls(self):
+        caller = REPOSITORY_WORKFLOW.replace('vinoguessr/.github/.github/', 'vinoguessr/.github//.github/')
+        self.assertRejected({'.github/workflows/repository.yml': caller},
+                            'job policy: vinoguessr/.github//.github/workflows/reusable-repository.yml@01fd9c61bce2139beb8ea173339d45c02d49b69f '
+                            'is not a canonical owner/repo[/path] reference')
+
+    def test_accepts_canonical_and_local_references(self):
+        sha = CHECKOUT.rpartition('@')[2]
+        steps = (PINNED_CHECKOUT + f'      - uses: github/codeql-action/init@{sha}\n'
+                 f'      - uses: Some-Owner/repo.name_2/sub-dir/action.v1@{sha}\n'
+                 '      - uses: ./.github/actions/build\n')
+        local_call = ('name: Local\non: pull_request\npermissions:\n  contents: read\njobs:\n'
+                      '  call:\n    uses: ./.github/workflows/ci.yml\n')
+        ok, output = self.run_policy({'.github/workflows/ci.yml': workflow(steps=steps),
+                                      '.github/workflows/local.yml': local_call})
+        self.assertTrue(ok, output)
 
     def test_accepts_any_spelling_of_false_for_persist_credentials(self):
         for line in ['persist-credentials: "false"', 'persist-credentials: False', 'Persist-Credentials: false']:
