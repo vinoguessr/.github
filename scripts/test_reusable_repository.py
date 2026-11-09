@@ -138,15 +138,24 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
         for checkout in [f'      - uses: {CHECKOUT}\n', f'      - uses: {CHECKOUT}\n        with:\n',
                          f'      - uses: {CHECKOUT}\n        with: nope\n',
                          f'      - uses: {CHECKOUT}\n        with:\n          persist-credentials: true\n',
-                         f'      - uses: {CHECKOUT.replace("actions/checkout", "Actions/Checkout")}\n']:
+                         f'      - uses: {CHECKOUT}\n        with:\n          persist-credentials: false\n'
+                         '          Persist-Credentials: true\n']:
             with self.subTest(checkout=checkout):
                 self.assertRejected({'.github/workflows/ci.yml': workflow(steps=checkout)},
                                     'job build: actions/checkout must set persist-credentials: false')
 
-    def test_accepts_quoted_or_capitalized_false_for_persist_credentials(self):
-        for value in ['"false"', 'False']:
-            with self.subTest(value=value):
-                steps = f'      - uses: {CHECKOUT}\n        with:\n          persist-credentials: {value}\n'
+    def test_recognizes_checkout_however_the_runner_spells_it(self):
+        for spelling in ['Actions/Checkout@', 'actions/checkout/@', 'actions//checkout@', 'actions\\checkout@',
+                         'actions/checkout/.@']:
+            with self.subTest(spelling=spelling):
+                steps = f'      - uses: {CHECKOUT.replace("actions/checkout@", spelling)}\n'
+                self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)},
+                                    'job build: actions/checkout must set persist-credentials: false')
+
+    def test_accepts_any_spelling_of_false_for_persist_credentials(self):
+        for line in ['persist-credentials: "false"', 'persist-credentials: False', 'Persist-Credentials: false']:
+            with self.subTest(line=line):
+                steps = f'      - uses: {CHECKOUT}\n        with:\n          {line}\n'
                 ok, output = self.run_policy({'.github/workflows/ci.yml': workflow(steps=steps)})
                 self.assertTrue(ok, output)
 
@@ -161,8 +170,13 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
     def test_reports_invalid_workflow_yaml(self):
         self.assertRejected({'.github/workflows/ci.yml': 'jobs: [\n'}, '.github/workflows/ci.yml: invalid YAML', 'line 2')
 
-    def test_reports_non_utf8_workflows(self):
-        self.assertRejected({'.github/workflows/ci.yml': b'name: \xff\n'}, '.github/workflows/ci.yml: invalid YAML')
+    def test_reports_unreadable_workflows(self):
+        for overrides in [{'.github/workflows/ci.yml': b'name: \xff\n'}, {'.github/workflows/ci.yml/README.md': 'x'}]:
+            with self.subTest(overrides=overrides):
+                ok, output = self.run_policy(overrides)
+                self.assertFalse(ok, output)
+                self.assertNotIn('Traceback', output)
+                self.assertIn('.github/workflows/ci.yml: cannot read the workflow', output)
 
     def test_reports_malformed_workflows_instead_of_crashing(self):
         cases = {

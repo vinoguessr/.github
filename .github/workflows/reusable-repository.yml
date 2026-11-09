@@ -69,10 +69,20 @@ jobs:
                   return {on}
               return {str(event) for event in on} if isinstance(on, (list, dict)) else set()
 
+          def action_name(ref):
+              # The runner splits the path on '/' and '\' and drops empty segments before taking owner/repo,
+              # so `actions//checkout@sha` and `actions\checkout/.@sha` still run actions/checkout.
+              segments = [segment for segment in re.split(r'[/\\]', ref.rpartition('@')[0]) if segment]
+              return '/'.join(segments[:2]).lower()
+
           def workflow_errors(path):
               try:
-                  workflow = yaml.load(path.read_text(), Loader=WorkflowLoader)
-              except (yaml.YAMLError, UnicodeDecodeError) as exc:
+                  text = path.read_text()
+              except (OSError, UnicodeDecodeError) as exc:
+                  return [f'{path}: cannot read the workflow: {exc}']
+              try:
+                  workflow = yaml.load(text, Loader=WorkflowLoader)
+              except yaml.YAMLError as exc:
                   return [f'{path}: invalid YAML: {" ".join(str(exc).split())}']
               if not isinstance(workflow, dict) or not isinstance(workflow.get('jobs'), dict):
                   return [f'{path}: expected a workflow mapping with jobs']
@@ -97,11 +107,11 @@ jobs:
                       if not (ref.startswith('./') or PINNED.fullmatch(ref)):
                           found.append(f'{path}: job {job_id}: {ref} is not pinned to a full commit SHA')
                   for step in steps:
-                      # Action names are case-insensitive on GitHub.
-                      if str(step.get('uses', '')).lower().startswith('actions/checkout@'):
-                          inputs = step.get('with')
-                          persist = inputs.get('persist-credentials') if isinstance(inputs, dict) else None
-                          if str(persist).lower() != 'false':
+                      if action_name(str(step.get('uses', ''))) == 'actions/checkout':
+                          inputs = step.get('with') if isinstance(step.get('with'), dict) else {}
+                          # Input names are case-insensitive, so every spelling present must say false.
+                          persist = [str(value).lower() for name, value in inputs.items() if str(name).lower() == 'persist-credentials']
+                          if not persist or any(value != 'false' for value in persist):
                               found.append(f'{path}: job {job_id}: actions/checkout must set persist-credentials: false')
               return found
 
