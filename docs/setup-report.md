@@ -41,10 +41,10 @@ This report records the move to the same structure as [sauna-studio](https://git
   - [vinoguessr-app#9](https://github.com/vinoguessr/vinoguessr-app/issues/9) Build and test VinoGuessrKit and the app in CI (P1)
   - [.github#2](https://github.com/vinoguessr/.github/issues/2) Enforce workflow hardening in every repository (P1)
 - The rename PRs [vinoguessr-api#405](https://github.com/vinoguessr/vinoguessr-api/pull/405) and [vinoguessr-app#7](https://github.com/vinoguessr/vinoguessr-app/pull/7) are merged
+- The six workflows the Project API reports have been enabled since the Project was created (GitHub defaults): Auto-add sub-issues to project, Auto-close issue, Item added to project, Item closed, Pull request linked to issue, Pull request merged
 
 ## Done (2026-11-09)
 
-- The six workflows the Project API reports are enabled: Auto-add sub-issues to project, Auto-close issue, Item added to project, Item closed, Pull request linked to issue, Pull request merged
 - Built the Google Cloud project `vinoguessr` with the vinoguessr-infrastructure runbook ([vinoguessr-infrastructure#2](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/2)):
   - `api.vinoguessr.com` and the passkey association file on `vinoguessr.com` are served through Cloudflare, the external HTTPS load balancer, and Cloud Run; direct `*.run.app` access is rejected
   - The vinoguessr-api Deploy workflow succeeded end to end against the new project
@@ -56,7 +56,7 @@ This report records the move to the same structure as [sauna-studio](https://git
 - Open PRs created before the foundation (Dependabot and older feature PRs) never report the new required checks until they are updated with main; rebase them (for Dependabot, comment `@dependabot rebase`)
 - The "By repository" view has no grouping yet; the REST API creates views without grouping, so set "Group by: Repository" in the Project UI
 - The Project still has the default "View 1" next to the provisioned views
-- The Project workflows "Auto-add to project" and "Auto-archive items" are not configured, and the Issue Forms do not set `projects`, so new Issues and PRs join the Project only when added by hand
+- The Project workflows "Auto-add to project" and "Auto-archive items" are not configured, and the Issue Forms do not set `projects`, so new top-level Issues and PRs join the Project only when added by hand; only sub-issues of Project items are added automatically
 - The GitHub wiki of `vinoguessr-docs` has not been initialized or synced from `docs/wiki`
 - No website is served: `blindlog-web` went away with the old project, and `vinoguessr.com` serves only the passkey association file until vinoguessr-web is deployed there ([vinoguessr-infrastructure#8](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/8))
 - Cloud Run resolves the app secrets at `latest` when each instance starts, so a new secret version mixes old and new values within one revision, and rolling back a revision does not restore the old value ([vinoguessr-infrastructure#6](https://github.com/vinoguessr/vinoguessr-infrastructure/issues/6))
