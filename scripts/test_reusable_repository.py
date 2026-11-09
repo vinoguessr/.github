@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,21 @@ def run_script(root):
     return result.returncode == 0, result.stdout + result.stderr
 
 
+def unguarded_commands(output):
+    """Lines the runner would read as workflow commands (`::name::` at the start of a line, or the legacy
+    `##[name]` anywhere in it) outside a `::stop-commands::<random token>` ... `::<token>::` block."""
+    commands, token = [], None
+    for line in output.splitlines():
+        if token is not None:
+            if line.strip() == f'::{token}::':
+                token = None
+        elif match := re.fullmatch(r'::stop-commands::([0-9a-f]{32})', line.strip()):
+            token = match.group(1)
+        elif line.lstrip().startswith('::') or '##[' in line:
+            commands.append(line)
+    return commands + (['(command processing is never resumed)'] if token is not None else [])
+
+
 class ReusableRepositoryPolicyTests(unittest.TestCase):
     """Runs the policy step that downstream repositories execute against fixture repositories."""
 
@@ -68,6 +84,7 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
         self.assertFalse(ok, output)
         for fragment in fragments:
             self.assertIn(fragment, output)
+        self.assertEqual(unguarded_commands(output), [], output)
 
     def test_complete_repository_passes(self):
         ok, output = self.run_policy({})
@@ -108,11 +125,14 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
         self.assertTrue(ok, output)
 
     def test_rejects_actions_not_pinned_to_a_full_commit_sha(self):
+        upper_sha = CHECKOUT.rpartition('@')[2].upper()
         steps = ('      - uses: actions/checkout@v7.0.1\n        with:\n          persist-credentials: false\n'
-                 '      - uses: actions/setup-python@6d4fd22\n')
+                 '      - uses: actions/setup-python@6d4fd22\n'
+                 f'      - uses: actions/setup-node@{upper_sha}\n')
         self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)},
                             '.github/workflows/ci.yml: job build: actions/checkout@v7.0.1 is not pinned to a full commit SHA',
-                            'actions/setup-python@6d4fd22 is not pinned')
+                            'actions/setup-python@6d4fd22 is not pinned',
+                            f'actions/setup-node@{upper_sha} is not pinned')
 
     def test_rejects_reusable_workflow_calls_not_pinned_to_a_full_commit_sha(self):
         caller = REPOSITORY_WORKFLOW.replace('@01fd9c61bce2139beb8ea173339d45c02d49b69f', '@main')
@@ -155,7 +175,8 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
     def test_rejects_non_canonical_action_references(self):
         # Each spelling is pinned and sets persist-credentials: false, so only its spelling is wrong.
         # U+0441 is CYRILLIC SMALL LETTER ES and U+FF43 is FULLWIDTH LATIN SMALL LETTER C; both look like "c".
-        for spelling in ['actions/check%6Fut', 'actions/checkout.git', 'actions/checkout.GIT', 'actions//checkout',
+        for spelling in ['actions/check%6Fut', 'actions/checkout.git', 'actions/checkout.GIT', 'actions/checkout.git/x',
+                         'actions//checkout',
                          'actions\\checkout', 'actions\\checkout/x', '/actions/checkout', 'actions/checkout/',
                          'actions/checkout/.', 'actions/checkout/../checkout', 'actions/checkout/ x',
                          'actions/\u0441heckout', 'actions/\uff43heckout', 'checkout']:
@@ -167,13 +188,13 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
                 self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)},
                                     f'job build: {shown} is not a canonical owner/repo[/path] reference')
 
-    def test_escapes_control_characters_so_a_reference_cannot_start_a_log_line(self):
-        ref = CHECKOUT + '\n::warning::injected'
-        steps = f'      - uses: {json.dumps(ref)}\n        with:\n          persist-credentials: false\n'
-        ok, output = self.run_policy({'.github/workflows/ci.yml': workflow(steps=steps)})
-        self.assertFalse(ok, output)
-        self.assertIn(f'{CHECKOUT}\\n::warning::injected is not pinned to a full commit SHA', output)
-        self.assertFalse(any(line.startswith('::') for line in output.splitlines()), output)
+    def test_error_output_cannot_issue_workflow_commands(self):
+        # assertRejected also requires every command-like line to be inside the stop-commands block.
+        for ref, error in [(CHECKOUT + '\n::warning::injected', f'{CHECKOUT}\\n::warning::injected is not pinned'),
+                           ('x##[warning]injected', 'job build: x##[warning]injected is not pinned')]:
+            with self.subTest(ref=ref):
+                steps = f'      - uses: {json.dumps(ref)}\n'
+                self.assertRejected({'.github/workflows/ci.yml': workflow(steps=steps)}, error)
 
     def test_rejects_non_canonical_reusable_workflow_calls(self):
         caller = REPOSITORY_WORKFLOW.replace('vinoguessr/.github/.github/', 'vinoguessr/.github//.github/')

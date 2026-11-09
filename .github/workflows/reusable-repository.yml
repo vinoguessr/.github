@@ -18,6 +18,7 @@ jobs:
           from pathlib import Path
           import json
           import re
+          import secrets
           import subprocess
           import sys
 
@@ -136,11 +137,14 @@ jobs:
               errors.extend(workflow_errors(path))
 
           def printable(text):
-              """Escape everything but printable ASCII: a look-alike character stays visible, and a newline in a
-              file name, job ID, or `uses:` cannot start a log line the runner reads as a workflow command."""
+              """Escape everything but printable ASCII, so a look-alike character stays visible and each error stays on one line."""
               return ''.join(c if ' ' <= c <= '~' else c.encode('unicode_escape').decode() for c in text)
 
           if errors:
-              print('\n'.join(map(printable, errors)), file=sys.stderr)
+              # Error text quotes file names, job IDs, and `uses:` values from the repository. Keeping each error on one
+              # line is not enough, because the runner also parses the legacy `##[command]` form anywhere in a line,
+              # so command processing stays paused around the errors under a token no workflow can predict.
+              token = secrets.token_hex(16)
+              print(f'::stop-commands::{token}', *map(printable, errors), f'::{token}::', sep='\n', file=sys.stderr)
               sys.exit(1)
           print('Repository policy files, workflow hardening, and sensitive-file exclusions verified.')
