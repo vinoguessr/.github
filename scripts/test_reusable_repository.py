@@ -55,7 +55,10 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
                 if text is None:
                     continue
                 (root / relative).parent.mkdir(parents=True, exist_ok=True)
-                (root / relative).write_text(text)
+                if isinstance(text, bytes):
+                    (root / relative).write_bytes(text)
+                else:
+                    (root / relative).write_text(text)
             subprocess.run(['git', 'add', '-A', '-f'], cwd=root, check=True)
             return run_script(root)
 
@@ -157,6 +160,9 @@ class ReusableRepositoryPolicyTests(unittest.TestCase):
 
     def test_reports_invalid_workflow_yaml(self):
         self.assertRejected({'.github/workflows/ci.yml': 'jobs: [\n'}, '.github/workflows/ci.yml: invalid YAML', 'line 2')
+
+    def test_reports_non_utf8_workflows(self):
+        self.assertRejected({'.github/workflows/ci.yml': b'name: \xff\n'}, '.github/workflows/ci.yml: invalid YAML')
 
     def test_reports_malformed_workflows_instead_of_crashing(self):
         cases = {

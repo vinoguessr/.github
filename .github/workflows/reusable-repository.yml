@@ -21,9 +21,8 @@ jobs:
           import subprocess
           import sys
 
-          # PyYAML comes with the runner's system Python as a cloud-init dependency rather than from
-          # the image's documented software list, so .github runs this step on itself (repository.yml)
-          # to catch an image that drops it. Installing it would add a download to every repository's check.
+          # The runner's system Python ships PyYAML although the image's software list does not document
+          # it (verified on ubuntu-26.04). Installing it would add a download to every repository's check.
           import yaml
 
           errors = []
