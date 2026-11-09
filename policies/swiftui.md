@@ -1,6 +1,6 @@
-## SwiftUI policy — iOS/iPadOS/macOS 27.0+
+## SwiftUI policy — iOS/iPadOS 27.0+
 
-Scope: SwiftUI work in `vinoguessr-app`. Read the available SwiftUI Expert Skill; project requirements override generic older-OS fallback advice. Verify availability against the deployment target and selected SDK. Do not impose an architecture or adopt Liquid Glass automatically.
+Scope: SwiftUI work in `vinoguessr-app`, which targets iOS and iPadOS only. macOS and visionOS are deferred ([ADR-0006](https://github.com/vinoguessr/vinoguessr-docs/blob/main/docs/adr/0006-app-platforms.md)), so iOS-only APIs need no platform guards; do not add `#if os(macOS)` or `#if os(visionOS)` branches. Read the available SwiftUI Expert Skill; project requirements override generic older-OS fallback advice. Verify availability against the deployment target and selected SDK. Do not impose an architecture or adopt Liquid Glass automatically.
 
 ### Layout
 
