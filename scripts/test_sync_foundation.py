@@ -56,6 +56,15 @@ class SyncFoundationTests(unittest.TestCase):
         self.assertIn((ROOT / 'policies/swiftui.md').read_text().rstrip(), agents)
         self.assertIn(f'SwiftUI policy source: `vinoguessr/.github@{SHA}:policies/swiftui.md`.', agents)
 
+    def test_app_text_targets_ios_and_ipados_and_tests_on_the_ios_simulator(self):
+        self.sync('vinoguessr-app')
+        for name in ['AGENTS.md', 'README.md']:
+            with self.subTest(file=name):
+                text = (self.target / name).read_text()
+                self.assertIn('iOS and iPadOS 27.0 or later', text)
+                self.assertNotIn('macOS 27', text)
+                self.assertIn("xcodebuild test -scheme VinoGuessrKit -destination 'platform=iOS Simulator", text)
+
     def test_repository_workflow_pins_reusable_workflows_to_the_sha(self):
         self.sync('vinoguessr-infrastructure')
         workflow = (self.target / '.github/workflows/repository.yml').read_text()
