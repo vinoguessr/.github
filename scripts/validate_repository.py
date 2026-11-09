@@ -25,28 +25,14 @@ REVIEW_AGENT_TOOLS = {"Read", "Grep", "Glob", "Bash"}
 JOB_WRITE_ALLOWLIST = {"security-events"}
 
 
-def trigger_events(on: object) -> set[str]:
-    """Workflow `on:` may be a string, a list, or a mapping."""
-    if isinstance(on, str):
-        return {on}
-    if isinstance(on, list):
-        return {str(event) for event in on}
-    if isinstance(on, dict):
-        return {str(event) for event in on}
-    return set()
-
-
 def runs_codeql(job: dict) -> bool:
     return any(str(step.get("uses", "")).startswith("github/codeql-action/") for step in job.get("steps") or [])
 
 
 def job_permissions_are_safe(permissions: object, codeql: bool) -> bool:
-    if isinstance(permissions, str):
-        return permissions == "read-all"
-    if isinstance(permissions, dict):
-        return all(value in ("read", "none") or (value == "write" and codeql and scope in JOB_WRITE_ALLOWLIST)
-                   for scope, value in permissions.items())
-    return False
+    return isinstance(permissions, dict) and all(
+        value in ("read", "none") or (value == "write" and codeql and scope in JOB_WRITE_ALLOWLIST)
+        for scope, value in permissions.items())
 
 
 def agent_tools(value: object) -> set[str]:
@@ -108,22 +94,16 @@ def validate(root: Path) -> list[str]:
         if not isinstance(data, dict):
             continue
         if p.parent.name == "workflows":
+            # SHA pins, persisted checkout credentials, write scopes at the workflow level, and
+            # pull_request_target are rejected by reusable-repository.yml, which .github runs on
+            # itself; these rules only tighten it for the foundation's own workflows.
             require("on" in data and "jobs" in data, f"Missing workflow trigger/jobs: {p.name}")
             require(data.get("permissions") == {"contents": "read"}, f"Workflow must default to contents:read: {p.name}")
-            require("pull_request_target" not in trigger_events(data.get("on")), f"Unsafe trigger: {p.name}")
             for job_id, job in (data.get("jobs") or {}).items():
                 if "uses" not in job:
                     require("timeout-minutes" in job, f"Missing job timeout: {p.name}")
                 if "permissions" in job:
                     require(job_permissions_are_safe(job["permissions"], runs_codeql(job)), f"Job permissions too broad: {p.name}: {job_id}")
-                uses = [job["uses"]] if "uses" in job else []
-                for step in job.get("steps", []):
-                    if "uses" in step:
-                        uses.append(step["uses"])
-                    if str(step.get("uses", "")).startswith("actions/checkout@"):
-                        require((step.get("with") or {}).get("persist-credentials") == "false", f"Checkout credentials persist: {p.name}")
-                for ref in uses:
-                    require(ref.startswith("./") or bool(re.search(r"@[0-9a-f]{40}$", ref)), f"Action/workflow is not SHA pinned: {p.name}: {ref}")
         if p.parent.name == "ISSUE_TEMPLATE" and p.name != "config.yml":
             require(bool(data.get("name")) and bool(data.get("description")), f"Missing form metadata: {p.name}")
             fields = data.get("body", [])
@@ -161,4 +141,4 @@ if __name__ == "__main__":
     if failures:
         print("\n".join(f"ERROR: {failure}" for failure in failures), file=sys.stderr)
         raise SystemExit(1)
-    print("Foundation files, YAML, TOML, Claude agents, workflow security policy, Issue Forms, and local links verified.")
+    print("Foundation files, YAML, TOML, Claude agents, foundation workflow permissions and timeouts, Issue Forms, and local links verified.")

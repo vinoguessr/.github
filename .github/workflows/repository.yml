@@ -1,0 +1,18 @@
+name: Repository CI
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: repository-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  policy:
+    # The defining repository calls its working copy instead of a SHA, so a policy change runs
+    # on the real runner against .github in the same PR, before any repository bumps its pin.
+    uses: ./.github/workflows/reusable-repository.yml
+    permissions:
+      contents: read
