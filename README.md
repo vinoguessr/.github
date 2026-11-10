@@ -7,7 +7,7 @@ This repository is the source of truth for the shared development rules, the org
 | Repository | Responsibility |
 | --- | --- |
 | [vinoguessr-api](https://github.com/vinoguessr/vinoguessr-api) | Swift 6 / Hummingbird / PostgreSQL / PostgresNIO / Valkey / Atlas / OpenAPI |
-| [vinoguessr-app](https://github.com/vinoguessr/vinoguessr-app) | SwiftUI app for players / iOS, iPadOS, and macOS 27.0 or later |
+| [vinoguessr-app](https://github.com/vinoguessr/vinoguessr-app) | SwiftUI app for players / iOS and iPadOS 27.0 or later |
 | [vinoguessr-web](https://github.com/vinoguessr/vinoguessr-web) | Web for players / Swift and Hummingbird |
 | [vinoguessr-infrastructure](https://github.com/vinoguessr/vinoguessr-infrastructure) | Terraform / Google Cloud Run / Cloudflare / OpenTelemetry |
 | [vinoguessr-docs](https://github.com/vinoguessr/vinoguessr-docs) | Design documents / ADRs / wiki |
