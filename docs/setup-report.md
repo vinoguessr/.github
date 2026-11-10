@@ -5,7 +5,7 @@ This report records the move to the same structure as [sauna-studio](https://git
 ## Decisions
 
 - Repositories: add `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` to `vinoguessr-api` / `vinoguessr-app` / `vinoguessr-web`
-- Agents: Codex by default; an independent Claude Code review substitutes when Codex cannot review because of its usage limit. For the 2026-11-10 handoff, the owner also allowed substitution when a repository environment is missing
+- Agents: Codex by default; an independent Claude Code review substitutes only when Codex cannot review because of its usage limit, as defined in [AGENTS.md](../AGENTS.md#code-review-and-merge-conditions)
 - Web: keep the Swift / Hummingbird stack
 - Google Cloud: bootstrap the new project `vinoguessr` through Issues and PRs after this foundation and the infrastructure repository are in place
 - Language: code, documentation, commit messages, labels, and PR titles in English; Issue and PR bodies in Japanese. Squash merges use the PR title as the commit subject and the commit messages as the body, so Japanese PR bodies never land in the history
@@ -81,7 +81,7 @@ This report records the move to the same structure as [sauna-studio](https://git
 - The owner will resume the pre-foundation PRs [vinoguessr-api#236](https://github.com/vinoguessr/vinoguessr-api/pull/236), [#271](https://github.com/vinoguessr/vinoguessr-api/pull/271), and [#329](https://github.com/vinoguessr/vinoguessr-api/pull/329) later. They need the current main and required checks before they can merge; this handoff leaves them untouched
 - The owner approval gate for production deploys remains deferred by the owner's decision ([.github#6](https://github.com/vinoguessr/.github/issues/6)). The workflows still deploy automatically; agent-initiated production deploys and merges to api/web main require the owner's approval for each operation
 - Update the pinned Atlas version by 2027-03-26 ([vinoguessr-api#419](https://github.com/vinoguessr/vinoguessr-api/issues/419))
-- Owner: decide whether to create the missing Codex cloud environments. Several review requests still return "create an environment for this repo"; substitute review evidence is recorded on the affected PRs
+- Owner: decide whether to create the missing Codex cloud environments. Several review requests still return "create an environment for this repo"
 - Owner: save "Group by: Repository" in the Project's "By repository" view. Its grouping is still empty in the API
 - Check Project membership when opening Issues or PRs. "Auto-add to project" is enabled, but the API does not expose its repository/filter configuration; the Issue Forms do not set `projects`. The five sync PRs were added explicitly. "Auto-archive items" is not configured
 - Owner: initialize the GitHub wiki of `vinoguessr-docs` with its first page, then sync `docs/wiki`. The repository has Wiki enabled, but the wiki git endpoint still returns "Repository not found"
