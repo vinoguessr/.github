@@ -40,3 +40,5 @@ This repository does not deploy to production or create billed resources. GitHub
 - [Workflow dependency lockfiles](policies/workflow-lockfiles.md): generated coverage and provenance verification alongside existing SHA pins.
 
 To roll out only workaround tracking without replacing other foundation files, use `python3 bootstrap/sync_workaround_tracking.py --sha <merged-full-SHA> --repo <repository> --target <clean-checkout>`. It preserves every other AGENTS.md section and refuses to overwrite a different existing workaround form.
+
+To update only deployment-confirmation rules, use `python3 bootstrap/sync_deploy_confirmation.py --sha <merged-full-SHA> --repo <repository> --target <clean-checkout>`. It preserves unrelated rules and refuses unfamiliar policy text. Production deployments do not need a separate user confirmation; existing authentication, permissions, CI, and review gates remain.

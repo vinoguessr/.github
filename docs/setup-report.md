@@ -2,6 +2,10 @@
 
 This report records the move to the same structure as [sauna-studio](https://github.com/sauna-studio/.github). Only finished items are listed as done; anything not yet run or verified is listed under open items. Status was checked on 2026-11-10 (JST).
 
+## Deployment-confirmation update (2026-11-17)
+
+The owner's latest instruction removes the separate user confirmation for production deployments, including merges that trigger existing deployment workflows. Authentication, permissions, CI, and review gates remain unchanged. Billed resource creation, `terraform apply`, and broad IAM changes still require explicit approval. This supersedes the per-operation approval wording in the historical snapshot below; [.github#6](https://github.com/vinoguessr/.github/issues/6) is closed as not planned, and the rule rollout is tracked in [.github#19](https://github.com/vinoguessr/.github/issues/19). No workflow or cloud setting is changed by this policy update.
+
 ## Decisions
 
 - Repositories: add `.github` / `vinoguessr-docs` / `vinoguessr-infrastructure` to `vinoguessr-api` / `vinoguessr-app` / `vinoguessr-web`
@@ -76,7 +80,7 @@ This report records the move to the same structure as [sauna-studio](https://git
 - Synced all five product repositories to `vinoguessr/.github@13fb97569cc4d4323a439db52f55ce962e63c12f`: [api#420](https://github.com/vinoguessr/vinoguessr-api/pull/420), [app#24](https://github.com/vinoguessr/vinoguessr-app/pull/24), [web#9](https://github.com/vinoguessr/vinoguessr-web/pull/9), [docs#7](https://github.com/vinoguessr/vinoguessr-docs/pull/7), and [infrastructure#14](https://github.com/vinoguessr/vinoguessr-infrastructure/pull/14). All are merged, call the pinned shared policy, and passed required CI and independent reviews. The app-specific instructions and README were preserved apart from the source SHA and the README end marker; its SwiftUI policy matches the shared source. Closed [.github#7](https://github.com/vinoguessr/.github/issues/7) after verifying the five merges and deployments
 - After the owner's explicit approval, deployed the sync merges to production: [API Deploy](https://github.com/vinoguessr/vinoguessr-api/actions/runs/42764336801) and [Web Deploy](https://github.com/vinoguessr/vinoguessr-web/actions/runs/42764343729) both succeeded. Cloud Run reports `vinoguessr-api-00012-kzj` and `vinoguessr-web-00005-5rh` ready, each serving 100% of traffic with its corresponding main image. Results are recorded on the PRs
 
-## Open items
+## Open items (2026-11-10 historical snapshot)
 
 - The owner will resume the pre-foundation PRs [vinoguessr-api#236](https://github.com/vinoguessr/vinoguessr-api/pull/236), [#271](https://github.com/vinoguessr/vinoguessr-api/pull/271), and [#329](https://github.com/vinoguessr/vinoguessr-api/pull/329) later. They need the current main and required checks before they can merge; this handoff leaves them untouched
 - The owner approval gate for production deploys remains deferred by the owner's decision ([.github#6](https://github.com/vinoguessr/.github/issues/6)). The workflows still deploy automatically; agent-initiated production deploys and merges to api/web main require the owner's approval for each operation

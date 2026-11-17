@@ -55,7 +55,7 @@ SCOPES = {
     'vinoguessr-infrastructure': (
         'Infrastructure code: Terraform / Google Cloud Run / Cloudflare / OpenTelemetry.',
         'The VinoGuessr API and PostgreSQL are the source of truth for business data. Never expose credentials in Terraform state, plans, logs, or the repository. `vinoguessr-api`\'s GitHub Actions builds container images and rolls them out to Cloud Run, and Terraform ignores drift in the running image.',
-        'After implementing, run `terraform fmt -check -recursive` / `terraform init -backend=false` / `terraform validate`. Do not run apply, production deploys, billed resource creation, or broad IAM grants without explicit approval.',
+        'After implementing, run `terraform fmt -check -recursive` / `terraform init -backend=false` / `terraform validate`. Do not run apply, billed resource creation, or broad IAM grants without explicit approval.',
     ),
     'vinoguessr-docs': (
         'Architecture, ADRs, and the GitHub wiki index.',
