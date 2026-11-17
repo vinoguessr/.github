@@ -38,3 +38,5 @@ actionlint
 This repository does not deploy to production or create billed resources. GitHub settings are applied with [bootstrap/provision.py](bootstrap/provision.py), and the results and open items are recorded in [docs/setup-report.md](docs/setup-report.md).
 
 - [Workflow dependency lockfiles](policies/workflow-lockfiles.md): generated coverage and provenance verification alongside existing SHA pins.
+
+To roll out only workaround tracking without replacing other foundation files, use `python3 bootstrap/sync_workaround_tracking.py --sha <merged-full-SHA> --repo <repository> --target <clean-checkout>`. It preserves every other AGENTS.md section and refuses to overwrite a different existing workaround form.
