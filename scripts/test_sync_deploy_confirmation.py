@@ -52,6 +52,36 @@ class DeployConfirmationSyncTests(unittest.TestCase):
             self.assertEqual(agents.read_text(), original)
             self.assertEqual(coding.read_text(), 'custom coding policy')
 
+    def test_updates_only_the_existing_infrastructure_readme_sentence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            agents = target / 'AGENTS.md'
+            agents.write_text('## Security\n\n' + sync.OLD_APPROVAL + ' ' + sync.OLD_ENVIRONMENT + '\n\n## Specifics\n' + sync.OLD_INFRASTRUCTURE)
+            coding = target / sync.CODING
+            coding.parent.mkdir(parents=True)
+            coding.write_text(sync.OLD_CODING)
+            readme = target / 'README.md'
+            before, after = '# Infrastructure\n\nCustom setup.\n', '\nCustom operations.\n'
+            readme.write_text(before + sync.OLD_INFRASTRUCTURE + after)
+            sync.sync(ROOT, SHA, 'vinoguessr-infrastructure', target)
+            self.assertEqual(readme.read_text(), before + sync.NEW_INFRASTRUCTURE + after)
+            self.assertIn(sync.NEW_CODING, coding.read_text())
+
+    def test_refuses_an_unfamiliar_readme_without_writing_other_candidates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            original = '## Security\n\n' + sync.OLD_APPROVAL + ' ' + sync.OLD_ENVIRONMENT + '\n\n## Specifics\n' + sync.OLD_INFRASTRUCTURE
+            agents = target / 'AGENTS.md'
+            agents.write_text(original)
+            coding = target / sync.CODING
+            coding.parent.mkdir(parents=True)
+            coding.write_text(sync.OLD_CODING)
+            (target / 'README.md').write_text('Custom policy')
+            with self.assertRaises(RuntimeError):
+                sync.sync(ROOT, SHA, 'vinoguessr-infrastructure', target)
+            self.assertEqual(agents.read_text(), original)
+            self.assertEqual(coding.read_text(), sync.OLD_CODING)
+
 
 if __name__ == '__main__':
     unittest.main()

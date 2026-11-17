@@ -45,11 +45,16 @@ def sync(source, sha, repo, target):
         raise RuntimeError('Source does not contain the expected deployment-confirmation policy')
     agents = target / 'AGENTS.md'
     coding = target / CODING
-    # Validate both candidates before writing either file.
+    # Validate every candidate before writing any file.
     agent_text = updated_agents(agents.read_bytes().decode(), sha, repo)
     coding_text = replace_policy(coding.read_bytes().decode(), OLD_CODING, NEW_CODING)
-    agents.write_bytes(agent_text.encode())
-    coding.write_bytes(coding_text.encode())
+    candidates = [(agents, agent_text), (coding, coding_text)]
+    if repo == 'vinoguessr-infrastructure':
+        readme = target / 'README.md'
+        readme_text = replace_policy(readme.read_bytes().decode(), OLD_INFRASTRUCTURE, NEW_INFRASTRUCTURE)
+        candidates.append((readme, readme_text))
+    for path, text in candidates:
+        path.write_bytes(text.encode())
 
 
 def main():
