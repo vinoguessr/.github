@@ -41,6 +41,10 @@ class ValidateRepositoryTests(unittest.TestCase):
     def test_repository_itself_is_valid(self):
         self.assertEqual(self.errors(), [])
 
+    def test_rejects_workaround_form_without_tracking_label(self):
+        self.write(".github/ISSUE_TEMPLATE/workaround.yml", "name: Tracking\ndescription: d\nlabels: []\nbody: []\n")
+        self.assertRejected("Workaround form must apply the workaround label")
+
     def test_checks_yaml_extension_workflows(self):
         self.write('.github/workflows/x.yaml', 'on: push\npermissions: write-all\njobs:\n  a:\n    runs-on: ubuntu-latest\n'
                    '    steps:\n      - uses: actions/checkout@v4\n')

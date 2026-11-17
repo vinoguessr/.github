@@ -12,6 +12,12 @@ spec.loader.exec_module(provision)
 
 
 class ProvisionConfigurationTests(unittest.TestCase):
+    def test_issue_form_labels_are_provisioned(self):
+        labels = {name for name, _, _ in provision.LABELS}
+        for path in (ROOT / ".github/ISSUE_TEMPLATE").glob("*.yml"):
+            form = yaml.safe_load(path.read_text())
+            self.assertTrue(set(form.get("labels", [])) <= labels, path.name)
+
     def test_every_repository_has_an_area_and_required_checks(self):
         for repo in provision.REPOS:
             self.assertIn(repo, provision.AREA_BY_REPO)
