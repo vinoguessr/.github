@@ -55,7 +55,7 @@ def validate(root: Path) -> list[str]:
         "README.md", "profile/README.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md",
         ".github/CODEOWNERS", ".github/pull_request_template.md", ".github/dependabot.yml",
         ".github/ISSUE_TEMPLATE/config.yml", ".github/ISSUE_TEMPLATE/feature.yml",
-        ".github/ISSUE_TEMPLATE/bug.yml", ".codex/config.toml", "CLAUDE.md",
+        ".github/ISSUE_TEMPLATE/bug.yml", ".github/ISSUE_TEMPLATE/workaround.yml", ".codex/config.toml", "CLAUDE.md",
         ".claude/agents/reviewer.md", ".claude/agents/security-reviewer.md",
     ]
     for filename in required:
@@ -106,6 +106,8 @@ def validate(root: Path) -> list[str]:
                     require(job_permissions_are_safe(job["permissions"], runs_codeql(job)), f"Job permissions too broad: {p.name}: {job_id}")
         if p.parent.name == "ISSUE_TEMPLATE" and p.name != "config.yml":
             require(bool(data.get("name")) and bool(data.get("description")), f"Missing form metadata: {p.name}")
+            if p.name == "workaround.yml":
+                require("workaround" in data.get("labels", []), "Workaround form must apply the workaround label")
             fields = data.get("body", [])
             ids = [field.get("id") for field in fields]
             require(all(ids) and len(ids) == len(set(ids)), f"Missing/duplicate form IDs: {p.name}")
